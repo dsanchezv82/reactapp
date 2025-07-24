@@ -1,22 +1,33 @@
 {
   "expo": {
-    "name": "reactapp",
-    "slug": "reactapp",
+    "name": "Gardi",
+    "slug": "gardi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "reactapp",
+    "scheme": "gardi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mcryholdings.gardi",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "backgroundColor": "#ffffff",
+        "backgroundImage": "./assets/images/splash-background.png"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.mcryholdings.gardi",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "bundler": "metro",
