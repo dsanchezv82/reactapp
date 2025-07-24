@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Button, Modal, StyleSheet, Text, TextInput, View, Switch } from 'react-native';
-import LogoPlaceholder from '../components/LogoPlaceholder';
+import { Button, Modal, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import BannerLogo from '../components/BannerLogo';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -86,7 +86,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoWrapper}>
-        <LogoPlaceholder />
+        <BannerLogo />
       </View>
       {biometricEnabled ? (
         <>

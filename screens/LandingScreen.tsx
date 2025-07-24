@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import LogoPlaceholder from '../components/LogoPlaceholder';
+import BannerLogo from '../components/BannerLogo';
 
 export default function LandingScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.banner}>
-        <LogoPlaceholder />
+        <BannerLogo />
       </View>
       <View style={styles.spacer} />
       <View style={styles.buttonsContainer}>
@@ -33,11 +33,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     paddingTop: 32,
-  },
-  logo: {
-    width: 100,
-    height: 60,
-    resizeMode: 'contain',
   },
   spacer: {
     flex: 1,
