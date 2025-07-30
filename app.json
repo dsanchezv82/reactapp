@@ -11,10 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcryholdings.gardi",
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "backgroundColor": "#ffffff",
-        "backgroundImage": "./assets/images/splash-background.png"
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication"
       }
     },
     "android": {
@@ -23,11 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.mcryholdings.gardi",
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+      "package": "com.mcryholdings.gardi"
     },
     "web": {
       "bundler": "metro",

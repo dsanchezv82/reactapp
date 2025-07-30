@@ -3,7 +3,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Button, Modal, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import BannerLogo from '../components/BannerLogo';
+import BannerLogoSvg from '../components/BannerLogoSvg';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -86,7 +86,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoWrapper}>
-        <BannerLogo />
+        <BannerLogoSvg width={200} height={100} color="#007AFF" />
       </View>
       {biometricEnabled ? (
         <>

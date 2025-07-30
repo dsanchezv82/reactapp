@@ -1,19 +1,27 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import BannerLogo from '../components/BannerLogo';
+import BannerLogoSvg from '../components/BannerLogoSvg';
 
 export default function LandingScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.banner}>
-        <BannerLogo />
+        <BannerLogoSvg width={220} height={80} color="#007AFF" />
       </View>
       <View style={styles.spacer} />
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>Button 1</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>Button 2</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>Button 3</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>Button 4</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Button 1</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Button 2</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Button 3</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Button 4</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -28,7 +36,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
