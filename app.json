@@ -7,7 +7,8 @@
     "icon": "./assets/images/icon.png",
     "scheme": "gardi",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "main": "./App.tsx",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcryholdings.gardi",
@@ -24,12 +25,9 @@
       "package": "com.mcryholdings.gardi"
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "bundler": "metro"
     },
     "plugins": [
-      "expo-router",
       [
         "expo-splash-screen",
         {
@@ -40,11 +38,7 @@
         }
       ]
     ],
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "7296a89c-71db-4d6c-87b9-8c4b1449ceec"
       }

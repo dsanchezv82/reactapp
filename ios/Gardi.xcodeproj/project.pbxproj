@@ -7,29 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0703DD462B26CDF5C68F50DC /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DE34FA6FC4DAB60A18AC4869 /* PrivacyInfo.xcprivacy */; };
+		129F88FBE3C677D50AC4F555 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41003034473BC795EF6BE54F /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		9693927E657C3F7DF7872CAC /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE68E5727493C04596A6F5B /* ExpoModulesProvider.swift */; };
-		B37B4DC75ABCCACA70224685 /* libPods-reactapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A7B74756CC1E5704B7D0A5C6 /* libPods-reactapp.a */; };
+		7E9C22EF8DE3B205E6DA4767 /* libPods-Gardi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C298E36254521CB480E99F09 /* libPods-Gardi.a */; };
+		8C18D477A1B0F6ADCF77D3AD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A08A40231052C0ADB2D06892 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		13B07F961A680F5B00A75B9A /* reactapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = reactapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = reactapp/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = reactapp/Info.plist; sourceTree = "<group>"; };
-		1DE68E5727493C04596A6F5B /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-reactapp/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		209B5CD0F205082C8E327BEB /* Pods-reactapp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-reactapp.release.xcconfig"; path = "Target Support Files/Pods-reactapp/Pods-reactapp.release.xcconfig"; sourceTree = "<group>"; };
-		A7B74756CC1E5704B7D0A5C6 /* libPods-reactapp.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-reactapp.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = reactapp/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B14F2F5CDE249C301B17B33E /* Pods-reactapp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-reactapp.debug.xcconfig"; path = "Target Support Files/Pods-reactapp/Pods-reactapp.debug.xcconfig"; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Gardi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gardi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Gardi/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Gardi/Info.plist; sourceTree = "<group>"; };
+		2F5A01203DDFB3C76487DAF0 /* Pods-Gardi.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gardi.debug.xcconfig"; path = "Target Support Files/Pods-Gardi/Pods-Gardi.debug.xcconfig"; sourceTree = "<group>"; };
+		41003034473BC795EF6BE54F /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Gardi/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		A08A40231052C0ADB2D06892 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Gardi/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Gardi/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		DE34FA6FC4DAB60A18AC4869 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = reactapp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C298E36254521CB480E99F09 /* libPods-Gardi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Gardi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD0A8986AF892743A6AC7CA2 /* Pods-Gardi.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gardi.release.xcconfig"; path = "Target Support Files/Pods-Gardi/Pods-Gardi.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = reactapp/AppDelegate.swift; sourceTree = "<group>"; };
-		F11748442D0722820044C1D9 /* reactapp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "reactapp-Bridging-Header.h"; path = "reactapp/reactapp-Bridging-Header.h"; sourceTree = "<group>"; };
+		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Gardi/AppDelegate.swift; sourceTree = "<group>"; };
+		F11748442D0722820044C1D9 /* Gardi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Gardi-Bridging-Header.h"; path = "Gardi/Gardi-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,43 +37,60 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B37B4DC75ABCCACA70224685 /* libPods-reactapp.a in Frameworks */,
+				7E9C22EF8DE3B205E6DA4767 /* libPods-Gardi.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		13B07FAE1A68108700A75B9A /* reactapp */ = {
+		01E83B4C72A2B40DB37CDC95 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				2F5A01203DDFB3C76487DAF0 /* Pods-Gardi.debug.xcconfig */,
+				DD0A8986AF892743A6AC7CA2 /* Pods-Gardi.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		13B07FAE1A68108700A75B9A /* Gardi */ = {
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
-				F11748442D0722820044C1D9 /* reactapp-Bridging-Header.h */,
+				F11748442D0722820044C1D9 /* Gardi-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				DE34FA6FC4DAB60A18AC4869 /* PrivacyInfo.xcprivacy */,
+				A08A40231052C0ADB2D06892 /* PrivacyInfo.xcprivacy */,
 			);
-			name = reactapp;
+			name = Gardi;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				A7B74756CC1E5704B7D0A5C6 /* libPods-reactapp.a */,
+				C298E36254521CB480E99F09 /* libPods-Gardi.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		2E09E10A48FD4CD5EFFE7817 /* Pods */ = {
+		4EDEB5B1E48B578CE69ED525 /* Gardi */ = {
 			isa = PBXGroup;
 			children = (
-				B14F2F5CDE249C301B17B33E /* Pods-reactapp.debug.xcconfig */,
-				209B5CD0F205082C8E327BEB /* Pods-reactapp.release.xcconfig */,
+				41003034473BC795EF6BE54F /* ExpoModulesProvider.swift */,
 			);
-			path = Pods;
+			name = Gardi;
+			sourceTree = "<group>";
+		};
+		4FE6AC4B6DE1862ECCEE6C2A /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				4EDEB5B1E48B578CE69ED525 /* Gardi */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -86,12 +103,12 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				13B07FAE1A68108700A75B9A /* reactapp */,
+				13B07FAE1A68108700A75B9A /* Gardi */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				2E09E10A48FD4CD5EFFE7817 /* Pods */,
-				93571F7CDD3790F8991AA606 /* ExpoModulesProviders */,
+				01E83B4C72A2B40DB37CDC95 /* Pods */,
+				4FE6AC4B6DE1862ECCEE6C2A /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -101,25 +118,9 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* reactapp.app */,
+				13B07F961A680F5B00A75B9A /* Gardi.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		8A6A706CD44E3AE135D26D33 /* reactapp */ = {
-			isa = PBXGroup;
-			children = (
-				1DE68E5727493C04596A6F5B /* ExpoModulesProvider.swift */,
-			);
-			name = reactapp;
-			sourceTree = "<group>";
-		};
-		93571F7CDD3790F8991AA606 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				8A6A706CD44E3AE135D26D33 /* reactapp */,
-			);
-			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -128,32 +129,32 @@
 				BB2F792C24A3F905000567C9 /* Expo.plist */,
 			);
 			name = Supporting;
-			path = reactapp/Supporting;
+			path = Gardi/Supporting;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		13B07F861A680F5B00A75B9A /* reactapp */ = {
+		13B07F861A680F5B00A75B9A /* Gardi */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "reactapp" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Gardi" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				140216AC4FCF40B2820AC85B /* [Expo] Configure project */,
+				35EF3D1FC330E78E35CF62A9 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				2737BF6DF050CE37FCF76DA6 /* [CP] Embed Pods Frameworks */,
+				766CEE4B458744B86011A72F /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = reactapp;
-			productName = reactapp;
-			productReference = 13B07F961A680F5B00A75B9A /* reactapp.app */;
+			name = Gardi;
+			productName = Gardi;
+			productReference = 13B07F961A680F5B00A75B9A /* Gardi.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -169,7 +170,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "reactapp" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Gardi" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -182,7 +183,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* reactapp */,
+				13B07F861A680F5B00A75B9A /* Gardi */,
 			);
 		};
 /* End PBXProject section */
@@ -195,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				0703DD462B26CDF5C68F50DC /* PrivacyInfo.xcprivacy in Resources */,
+				8C18D477A1B0F6ADCF77D3AD /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,14 +233,14 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-reactapp-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Gardi-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		140216AC4FCF40B2820AC85B /* [Expo] Configure project */ = {
+		35EF3D1FC330E78E35CF62A9 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -256,15 +257,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-reactapp/expo-configure-project.sh\"\n";
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Gardi/expo-configure-project.sh\"\n";
 		};
-		2737BF6DF050CE37FCF76DA6 /* [CP] Embed Pods Frameworks */ = {
+		766CEE4B458744B86011A72F /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-reactapp/Pods-reactapp-frameworks.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-Gardi/Pods-Gardi-frameworks.sh",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
 			);
 			name = "[CP] Embed Pods Frameworks";
@@ -273,7 +274,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-reactapp/Pods-reactapp-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Gardi/Pods-Gardi-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -282,13 +283,14 @@
 			files = (
 			);
 			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-reactapp/Pods-reactapp-resources.sh",
+				"${PODS_ROOT}/Target Support Files/Pods-Gardi/Pods-Gardi-resources.sh",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoSystemUI/ExpoSystemUI_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/SDWebImage/SDWebImage.bundle",
@@ -303,6 +305,7 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoSystemUI_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SDWebImage.bundle",
@@ -311,7 +314,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-reactapp/Pods-reactapp-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Gardi/Pods-Gardi-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -322,7 +325,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				9693927E657C3F7DF7872CAC /* ExpoModulesProvider.swift in Sources */,
+				129F88FBE3C677D50AC4F555 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -331,19 +334,18 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B14F2F5CDE249C301B17B33E /* Pods-reactapp.debug.xcconfig */;
+			baseConfigurationReference = 2F5A01203DDFB3C76487DAF0 /* Pods-Gardi.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = reactapp/reactapp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Gardi/Gardi.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
 					"FB_SONARKIT_ENABLED=1",
 				);
-				INFOPLIST_FILE = reactapp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Gardi;
+				INFOPLIST_FILE = Gardi/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -356,9 +358,9 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mcryholdings.gardi";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mcryholdings.gardi;
 				PRODUCT_NAME = "Gardi";
-				SWIFT_OBJC_BRIDGING_HEADER = "reactapp/reactapp-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "Gardi/Gardi-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -368,14 +370,13 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 209B5CD0F205082C8E327BEB /* Pods-reactapp.release.xcconfig */;
+			baseConfigurationReference = DD0A8986AF892743A6AC7CA2 /* Pods-Gardi.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = reactapp/reactapp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Gardi/Gardi.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = reactapp/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Gardi;
+				INFOPLIST_FILE = Gardi/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -388,9 +389,9 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.mcryholdings.gardi";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mcryholdings.gardi;
 				PRODUCT_NAME = "Gardi";
-				SWIFT_OBJC_BRIDGING_HEADER = "reactapp/reactapp-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "Gardi/Gardi-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
@@ -452,7 +453,10 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -507,7 +511,10 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = "$(inherited)  ";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					" ",
+				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
@@ -518,7 +525,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "reactapp" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Gardi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -527,7 +534,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "reactapp" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Gardi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
