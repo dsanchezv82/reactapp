@@ -1,28 +1,44 @@
 {
   "expo": {
     "name": "Gardi",
-    "slug": "gardi",
+    "slug": "gardi-app",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "scheme": "gardi",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
-    "main": "./App.tsx",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcryholdings.gardi",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication"
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication.",
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FFFFFF"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.mcryholdings.gardi"
+      "package": "com.mcryholdings.gardi",
+      "screenOrientation": "default"
     },
     "web": {
       "bundler": "metro"
@@ -36,12 +52,21 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      "expo-web-browser",
+      "expo-video",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "DEFAULT"
+        }
       ]
     ],
     "extra": {
       "eas": {
         "projectId": "7296a89c-71db-4d6c-87b9-8c4b1449ceec"
       }
-    }
+    },
+    "newArchEnabled": false
   }
 }

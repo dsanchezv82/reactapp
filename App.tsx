@@ -3,14 +3,14 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { registerRootComponent } from 'expo';
-import { Bell, Home, Mail, Search, User } from 'lucide-react-native';
+import { Bell, Camera, Home, Mail, User } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
 
 import LandingScreen from './screens/LandingScreen';
 import LoginScreen from './screens/LoginScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import SearchScreen from './screens/SearchScreen';
+import VideoScreen from './screens/VideoScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -28,7 +28,7 @@ const MessagesScreen = () => (
   </View>
 );
 
-// Main Tab Navigator (shown after successful login)
+// Main Tab Navigator with cross-platform optimizations
 function MainTabNavigator() {
   return (
     <Tab.Navigator
@@ -56,11 +56,11 @@ function MainTabNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Search" 
-        component={SearchScreen}
+        name="Video" 
+        component={VideoScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Search size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <Camera size={focused ? 26 : 24} color={color} strokeWidth={2} />
           ),
         }}
       />
@@ -99,16 +99,17 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Optimized auth check - runs only when needed for mobile performance
   const checkAuthStatus = async () => {
     try {
       const userToken = await AsyncStorage.getItem('userToken');
-      console.log('Auth check - userToken:', userToken);
-      
-      // Only consider authenticated if token exists and is valid
       const isValidToken = userToken === 'logged_in';
       setIsAuthenticated(isValidToken);
       
-      console.log('Auth status:', isValidToken ? 'Authenticated' : 'Not authenticated');
+      // Only log during development - removed in production builds
+      if (__DEV__) {
+        console.log('Auth check completed:', isValidToken ? 'Authenticated' : 'Not authenticated');
+      }
     } catch (error) {
       console.log('Error checking auth status:', error);
       setIsAuthenticated(false);
@@ -118,15 +119,26 @@ function App() {
   };
 
   useEffect(() => {
-    // Initial auth check
+    // Initial auth check on app load
     checkAuthStatus();
-    
-    // Set up periodic check to detect login/logout changes
-    const authCheckInterval = setInterval(checkAuthStatus, 1000);
-    
-    return () => clearInterval(authCheckInterval);
+
+    // Listen for app state changes (foreground/background) for mobile security
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        // Re-check auth when app becomes active (mobile best practice)
+        checkAuthStatus();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Cleanup subscription on unmount for memory management
+    return () => {
+      subscription?.remove();
+    };
   }, []);
 
+  // Loading screen with proper mobile UX
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -135,24 +147,26 @@ function App() {
     );
   }
 
-  console.log('Rendering app - isAuthenticated:', isAuthenticated);
-
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
-          // Show login screen when not authenticated
           <Stack.Screen 
             name="Login" 
             component={LoginScreen}
-            options={{ gestureEnabled: false }} // Prevent swipe back
+            options={{ 
+              gestureEnabled: false,
+              animationTypeForReplace: 'push'
+            }}
           />
         ) : (
-          // Show main app with tabs when authenticated
           <Stack.Screen 
             name="Main" 
             component={MainTabNavigator}
-            options={{ gestureEnabled: false }} // Prevent swipe back to login
+            options={{ 
+              gestureEnabled: false,
+              animationTypeForReplace: 'push'
+            }}
           />
         )}
       </Stack.Navigator>
@@ -185,5 +199,7 @@ const styles = StyleSheet.create({
   },
 });
 
+// Register the root component for proper Expo initialization
 registerRootComponent(App);
+
 export default App;

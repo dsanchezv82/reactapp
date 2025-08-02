@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LogOut, Settings, Shield, User } from 'lucide-react-native';
-import React from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ProfileScreen() {
@@ -40,8 +39,8 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <User size={60} color="#007AFF" strokeWidth={1.5} />
         </View>
-        <Text style={styles.username}>John Doe</Text>
-        <Text style={styles.email}>john.doe@example.com</Text>
+        <Text style={styles.username}>DS</Text>
+        <Text style={styles.email}>dsanchez@garditech.com</Text>
       </View>
 
       <View style={styles.content}>

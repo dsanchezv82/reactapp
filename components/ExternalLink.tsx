@@ -1,24 +1,75 @@
-import { Href, Link } from 'expo-router';
-import { openBrowserAsync } from 'expo-web-browser';
-import { type ComponentProps } from 'react';
-import { Platform } from 'react-native';
+import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
+import React from 'react';
+import {
+  Alert,
+  GestureResponderEvent,
+  Linking,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity
+} from 'react-native';
 
-type Props = Omit<ComponentProps<typeof Link>, 'href'> & { href: Href & string };
+interface ExternalLinkProps {
+  href: string;
+  children: React.ReactNode;
+  style?: any;
+  textStyle?: any;
+}
 
-export function ExternalLink({ href, ...rest }: Props) {
+export function ExternalLink({ href, children, style, textStyle }: ExternalLinkProps) {
+  const handlePress = async (event: GestureResponderEvent) => {
+    event.preventDefault();
+
+    try {
+      if (Platform.OS === 'web') {
+        // On web, open in new tab
+        window.open(href, '_blank');
+      } else {
+        // On mobile, use in-app browser for better UX
+        await openBrowserAsync(href, {
+          // Cross-platform browser options - using proper enum
+          presentationStyle: WebBrowserPresentationStyle.PAGE_SHEET,
+          controlsColor: '#007AFF',
+        });
+      }
+    } catch (error) {
+      // Fallback to system browser if in-app browser fails
+      console.log('In-app browser failed, falling back to system browser:', error);
+      try {
+        await Linking.openURL(href);
+      } catch (linkingError) {
+        Alert.alert(
+          'Unable to Open Link',
+          'Cannot open the requested link. Please check your internet connection.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
   return (
-    <Link
-      target="_blank"
-      {...rest}
-      href={href}
-      onPress={async (event) => {
-        if (Platform.OS !== 'web') {
-          // Prevent the default behavior of linking to the default browser on native.
-          event.preventDefault();
-          // Open the link in an in-app browser.
-          await openBrowserAsync(href);
-        }
-      }}
-    />
+    <TouchableOpacity
+      style={[styles.container, style]}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.linkText, textStyle]}>
+        {children}
+      </Text>
+    </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  linkText: {
+    color: '#007AFF',
+    fontSize: 16,
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+  },
+});
