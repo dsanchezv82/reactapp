@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Gardi",
-    "slug": "gardi-app",
+    "slug": "gardi",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -16,9 +16,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mcryholdings.gardi",
+      "bundleIdentifier": "com.garditech.gardi",
       "infoPlist": {
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication.",
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show you on the map and provide location-based services.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show you on the map and provide location-based services.",
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationLandscapeLeft",
@@ -37,8 +39,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.mcryholdings.gardi",
-      "screenOrientation": "default"
+      "package": "com.garditech.gardi",
+      "screenOrientation": "default",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro"

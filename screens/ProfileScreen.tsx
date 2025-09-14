@@ -1,8 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LogOut, Settings, Shield, User } from 'lucide-react-native';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen() {
+  const { logout, user } = useAuth();
+
   const handleLogout = async () => {
     Alert.alert(
       'Logout',
@@ -17,15 +19,11 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear all authentication data
-              await AsyncStorage.multiRemove(['userToken', 'biometricEnabled']);
-              console.log('User logged out, tokens cleared');
-              
-              // The App.tsx auth check interval will detect the missing token
-              // and automatically navigate back to LoginScreen
+              await logout();
+              console.log('✅ User logged out successfully');
             } catch (error) {
-              console.error('Error during logout:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+              console.log('❌ Logout error:', error);
+              Alert.alert('Logout Error', 'Failed to logout. Please try again.');
             }
           },
         },

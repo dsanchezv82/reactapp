@@ -1,18 +1,18 @@
 {
   "name": "reactapp",
-  "main": "App.tsx",
   "version": "1.0.0",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
+    "build": "eas build",
+    "build:ios": "eas build --platform ios",
+    "build:android": "eas build --platform android"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-navigation/bottom-tabs": "^7.4.4",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.16",
@@ -25,6 +25,8 @@
     "expo-image": "~2.4.0",
     "expo-linking": "~7.1.7",
     "expo-local-authentication": "^16.0.5",
+    "expo-navigation-bar": "~4.2.7",
+    "expo-screen-orientation": "~8.1.7",
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
@@ -36,14 +38,14 @@
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-gesture-handler": "~2.24.0",
+    "react-native-maps": "1.20.1",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "expo-screen-orientation": "~8.1.7",
-    "expo-navigation-bar": "~4.2.7"
+    "expo-location": "~18.1.6"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

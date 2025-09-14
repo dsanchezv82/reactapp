@@ -1,47 +1,64 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { registerRootComponent } from 'expo';
-import { Bell, Camera, Home, Mail, User } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
+import { Calendar, Camera, Home, Mail, User } from 'lucide-react-native';
+import { Platform, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Import contexts
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+
+// Import components
+import ThemedText from './components/ThemedText';
+import ThemedView from './components/ThemedView';
+
+// Import screens
+import EventsScreen from './screens/EventsScreen';
 import LandingScreen from './screens/LandingScreen';
 import LoginScreen from './screens/LoginScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import VideoScreen from './screens/VideoScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
 
-// Cross-platform optimized placeholder screens
-const NotificationsScreen = () => (
-  <View style={styles.screenContainer}>
-    <Text style={styles.screenText}>Notifications</Text>
-  </View>
-);
+// Loading screen component
+function LoadingScreen() {
+  const { theme } = useTheme();
+  
+  return (
+    <ThemedView style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+      <ThemedText type="title">Gardi</ThemedText>
+      <ThemedText type="secondary" style={{ marginTop: 8 }}>Loading...</ThemedText>
+    </ThemedView>
+  );
+}
 
-const MessagesScreen = () => (
-  <View style={styles.screenContainer}>
-    <Text style={styles.screenText}>Messages</Text>
-  </View>
-);
+// Messages screen placeholder
+function MessagesScreen() {
+  return (
+    <ThemedView style={styles.centerContainer}>
+      <ThemedText type="title">Messages</ThemedText>
+      <ThemedText type="secondary">Coming soon...</ThemedText>
+    </ThemedView>
+  );
+}
 
-// Main Tab Navigator with cross-platform optimizations
+// Theme-aware Tab Navigator
 function MainTabNavigator() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 88 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 34 : 10,
+          paddingBottom: Platform.OS === 'ios' ? 34 : 10,  
           paddingTop: 8,
-          backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E5EA',
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.colors.border,
         },
         headerShown: false,
       }}
@@ -65,11 +82,11 @@ function MainTabNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Notifications" 
-        component={NotificationsScreen}
+        name="Events" 
+        component={EventsScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Bell size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <Calendar size={focused ? 26 : 24} color={color} strokeWidth={2} />
           ),
         }}
       />
@@ -95,111 +112,43 @@ function MainTabNavigator() {
   );
 }
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+// App navigator with authentication logic
+function AppNavigator() {
+  const { isAuthenticated, loading } = useAuth();
 
-  // Optimized auth check - runs only when needed for mobile performance
-  const checkAuthStatus = async () => {
-    try {
-      const userToken = await AsyncStorage.getItem('userToken');
-      const isValidToken = userToken === 'logged_in';
-      setIsAuthenticated(isValidToken);
-      
-      // Only log during development - removed in production builds
-      if (__DEV__) {
-        console.log('Auth check completed:', isValidToken ? 'Authenticated' : 'Not authenticated');
-      }
-    } catch (error) {
-      console.log('Error checking auth status:', error);
-      setIsAuthenticated(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Initial auth check on app load
-    checkAuthStatus();
-
-    // Listen for app state changes (foreground/background) for mobile security
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'active') {
-        // Re-check auth when app becomes active (mobile best practice)
-        checkAuthStatus();
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    // Cleanup subscription on unmount for memory management
-    return () => {
-      subscription?.remove();
-    };
-  }, []);
-
-  // Loading screen with proper mobile UX
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading Gardi...</Text>
-      </View>
-    );
+  if (loading) {
+    return <LoadingScreen />;
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{ 
-              gestureEnabled: false,
-              animationTypeForReplace: 'push'
-            }}
-          />
-        ) : (
-          <Stack.Screen 
-            name="Main" 
-            component={MainTabNavigator}
-            options={{ 
-              gestureEnabled: false,
-              animationTypeForReplace: 'push'
-            }}
-          />
-        )}
-      </Stack.Navigator>
+      {isAuthenticated ? <MainTabNavigator /> : <LoginScreen />}
     </NavigationContainer>
   );
 }
 
+// Main App component - production-ready default export
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <SafeAreaProvider>
+          <AppNavigator />
+        </SafeAreaProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  screenContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-  screenText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1D1D1F',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
   },
-  loadingText: {
-    fontSize: 18,
-    color: '#007AFF',
-    fontWeight: '500',
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
-
-// Register the root component for proper Expo initialization
-registerRootComponent(App);
-
-export default App;

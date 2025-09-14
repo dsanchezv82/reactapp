@@ -6,9 +6,11 @@ import {
   Camera,
   Maximize,
   Minimize,
+  Moon,
   Pause,
   Play,
   RotateCcw,
+  Sun,
   Video as VideoIcon,
   Volume2,
   VolumeX
@@ -21,17 +23,32 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+// Import your themed components
+import ThemedText from '../components/ThemedText';
+import ThemedView from '../components/ThemedView';
+import { useTheme } from '../contexts/ThemeContext';
+
+// Mobile-optimized video item interface for backend integration
 interface VideoItem {
   id: number;
   title: string;
   description: string;
-  source: any;
+  source: any; // Will be string URL when connected to backend
+  thumbnail?: string; // Optional thumbnail URL for mobile performance
+  duration?: number; // Video duration in seconds for UX  
+  category?: string; // Video category for organization
+  createdAt?: string; // ISO date string for sorting
+}
+
+// Mobile-optimized screen dimensions interface
+interface ScreenDimensions {
+  width: number;
+  height: number;
 }
 
 export default function VideoScreen(): React.JSX.Element {
@@ -39,48 +56,83 @@ export default function VideoScreen(): React.JSX.Element {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showControls, setShowControls] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [screenData, setScreenData] = useState(Dimensions.get('window'));
+  const [screenData, setScreenData] = useState<ScreenDimensions>(Dimensions.get('window'));
   const [orientation, setOrientation] = useState<ScreenOrientation.Orientation>(
     ScreenOrientation.Orientation.PORTRAIT_UP
   );
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const parentNavigator = useRef<any>(null);
+  const { theme, isDark, toggleTheme } = useTheme();
 
-  // TODO: Replace with backend API endpoint when ready
-  // const API_ENDPOINT = 'https://your-backend.com/api/videos';
+  // Debug theme state for mobile development
+  useEffect(() => {
+    console.log('📱 VideoScreen theme state - isDark:', isDark, 'background:', theme.colors.background);
+  }, [isDark, theme]);
+
+  // Backend API configuration - secure production domain
+  const API_ENDPOINT = 'https://api.garditech.com/api/videos';
   
+  // Sample videos with fallback system for mobile development
   const sampleVideos: VideoItem[] = [
     {
       id: 1,
       title: 'Gardi Protect',
       description: 'Learn how Gardi keeps your teen protected on the road',
       source: require('../assets/videos/protect-video.mp4'),
+      category: 'Safety',
+      duration: 120, // 2 minutes
       // TODO: Replace with streaming endpoint when backend is ready
       // source: `${API_ENDPOINT}/protect-video.mp4`,
+      // thumbnail: `${API_ENDPOINT}/thumbnails/protect-video.jpg`,
     },
     {
       id: 2,
       title: 'Teen Driver Safety',
       description: 'Best practices for young drivers',
       source: require('../assets/videos/teen-safety.mp4'),
+      category: 'Education',
+      duration: 180, // 3 minutes
       // TODO: Replace with streaming endpoint when backend is ready
       // source: `${API_ENDPOINT}/teen-safety.mp4`,
+      // thumbnail: `${API_ENDPOINT}/thumbnails/teen-safety.jpg`,
     },
+    // Temporarily commented out until asset is available
+    // {
+    //   id: 3,
+    //   title: 'Gardi Features Overview',
+    //   description: 'Complete overview of all Gardi safety features',
+    //   source: require('../assets/videos/features-overview.mp4'),
+    //   category: 'Tutorial',
+    //   duration: 240, // 4 minutes
+    // },
   ];
 
   // Modern expo-video player setup with mobile optimization
   const player = useVideoPlayer(sampleVideos[currentVideoIndex].source, (player) => {
     player.loop = false;
     player.muted = isMuted;
+    // Mobile optimization: External playback support for AirPlay/Chromecast
+    player.allowsExternalPlayback = true;
+    // Note: Picture-in-Picture is handled by VideoView component, not player
   });
 
-  // Store parent navigator reference
+  // Store parent navigator reference for tab bar control
   useEffect(() => {
     parentNavigator.current = navigation.getParent();
   }, [navigation]);
 
-  // Listen for orientation changes
+  // Update status bar style based on theme for cross-platform compatibility
+  useEffect(() => {
+    if (!isFullscreen) {
+      StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor(theme.colors.surface, true);
+      }
+    }
+  }, [isDark, isFullscreen, theme]);
+
+  // Listen for orientation changes with mobile performance optimization
   useEffect(() => {
     const getOrientation = async () => {
       const currentOrientation = await ScreenOrientation.getOrientationAsync();
@@ -103,7 +155,7 @@ export default function VideoScreen(): React.JSX.Element {
     };
   }, []);
 
-  // Auto-hide controls after 3 seconds when playing
+  // Auto-hide controls after 3 seconds when playing for better mobile UX
   useEffect(() => {
     let hideControlsTimer: NodeJS.Timeout;
     
@@ -120,58 +172,39 @@ export default function VideoScreen(): React.JSX.Element {
     };
   }, [player.playing, showControls]);
 
-  // Enhanced fullscreen mode with working tab bar suppression
+  // Enhanced fullscreen mode with cross-platform tab bar suppression
   useEffect(() => {
     const handleFullscreenMode = async () => {
       try {
         if (isFullscreen) {
-          // Hide status bar
+          // Hide status bar with smooth animation
           StatusBar.setHidden(true, 'slide');
           
-          // Working tab bar hiding - target all possible navigation levels
+          // Multi-level tab bar hiding for React Navigation compatibility
           const rootNavigator = navigation.getParent();
           const tabNavigator = rootNavigator?.getParent();
           
-          // Method 1: Direct parent navigator
+          // Hide tab bar at all navigation levels
+          const hiddenTabBarStyle = { 
+            display: 'none' as const,
+            height: 0,
+            opacity: 0,
+            position: 'absolute' as const,
+            bottom: -100,
+          };
+
           if (parentNavigator.current) {
-            parentNavigator.current.setOptions({
-              tabBarStyle: { 
-                display: 'none',
-                height: 0,
-                opacity: 0,
-                position: 'absolute',
-                bottom: -100,
-              }
-            });
+            parentNavigator.current.setOptions({ tabBarStyle: hiddenTabBarStyle });
           }
           
-          // Method 2: Root navigator
           if (rootNavigator) {
-            rootNavigator.setOptions({
-              tabBarStyle: { 
-                display: 'none',
-                height: 0,
-                opacity: 0,
-                position: 'absolute',
-                bottom: -100,
-              }
-            });
+            rootNavigator.setOptions({ tabBarStyle: hiddenTabBarStyle });
           }
           
-          // Method 3: Tab navigator (if exists)
           if (tabNavigator) {
-            tabNavigator.setOptions({
-              tabBarStyle: { 
-                display: 'none',
-                height: 0,
-                opacity: 0,
-                position: 'absolute',
-                bottom: -100,
-              }
-            });
+            tabNavigator.setOptions({ tabBarStyle: hiddenTabBarStyle });
           }
           
-          // Method 4: Use navigation context to hide tab bar
           try {
             navigation.setOptions({
               tabBarVisible: false,
@@ -181,52 +214,47 @@ export default function VideoScreen(): React.JSX.Element {
             console.log('Navigation setOptions error:', error);
           }
           
-          // Hide Android navigation bar
+          // Android-specific navigation bar handling
           if (Platform.OS === 'android') {
             await NavigationBar.setVisibilityAsync('hidden');
             await NavigationBar.setBehaviorAsync('inset-swipe');
             await NavigationBar.setBackgroundColorAsync('#00000000');
           }
           
-          // Allow all orientations in fullscreen
+          // Allow all orientations in fullscreen for better video experience
           await ScreenOrientation.unlockAsync();
           
         } else {
-          // Restore status bar
+          // Restore status bar with theme-appropriate style
           StatusBar.setHidden(false, 'slide');
+          StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
           
-          // Restore tab bar - target all navigation levels
+          // Restore tab bar with theme colors
           const rootNavigator = navigation.getParent();
           const tabNavigator = rootNavigator?.getParent();
           
           const originalTabBarStyle = {
-            display: 'flex',
-            backgroundColor: '#FFFFFF',
-            borderTopColor: '#E5E5EA',
+            display: 'flex' as const,
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.border,
             borderTopWidth: StyleSheet.hairlineWidth,
             height: Platform.OS === 'ios' ? 90 : 60,
-            position: 'relative',
+            position: 'relative' as const,
             bottom: 0,
             opacity: 1,
           };
           
-          // Restore all navigation levels
+          // Restore all navigation levels with theme styling
           if (parentNavigator.current) {
-            parentNavigator.current.setOptions({
-              tabBarStyle: originalTabBarStyle
-            });
+            parentNavigator.current.setOptions({ tabBarStyle: originalTabBarStyle });
           }
           
           if (rootNavigator) {
-            rootNavigator.setOptions({
-              tabBarStyle: originalTabBarStyle
-            });
+            rootNavigator.setOptions({ tabBarStyle: originalTabBarStyle });
           }
           
           if (tabNavigator) {
-            tabNavigator.setOptions({
-              tabBarStyle: originalTabBarStyle
-            });
+            tabNavigator.setOptions({ tabBarStyle: originalTabBarStyle });
           }
           
           try {
@@ -238,13 +266,13 @@ export default function VideoScreen(): React.JSX.Element {
             console.log('Navigation restore setOptions error:', error);
           }
           
-          // Restore Android navigation bar
+          // Restore Android navigation bar with theme colors
           if (Platform.OS === 'android') {
             await NavigationBar.setVisibilityAsync('visible');
-            await NavigationBar.setBackgroundColorAsync('#FFFFFF');
+            await NavigationBar.setBackgroundColorAsync(theme.colors.surface);
           }
           
-          // Lock to portrait when not in fullscreen
+          // Lock to portrait when not in fullscreen for mobile UX
           await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         }
       } catch (error) {
@@ -253,22 +281,23 @@ export default function VideoScreen(): React.JSX.Element {
     };
 
     handleFullscreenMode();
-  }, [isFullscreen, navigation]);
+  }, [isFullscreen, navigation, isDark, theme]);
 
-  // Enhanced cleanup with working restoration methods
+  // Enhanced cleanup with React Navigation focus handling
   useFocusEffect(
     useCallback(() => {
       return () => {
-        // Force restore all UI elements
+        // Force restore all UI elements when screen loses focus
         StatusBar.setHidden(false, 'slide');
+        StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
         
         const originalTabBarStyle = {
-          display: 'flex',
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E5EA',
+          display: 'flex' as const,
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.OS === 'ios' ? 90 : 60,
-          position: 'relative',
+          position: 'relative' as const,
           bottom: 0,
           opacity: 1,
         };
@@ -278,21 +307,15 @@ export default function VideoScreen(): React.JSX.Element {
         const tabNavigator = rootNavigator?.getParent();
         
         if (parentNavigator.current) {
-          parentNavigator.current.setOptions({
-            tabBarStyle: originalTabBarStyle
-          });
+          parentNavigator.current.setOptions({ tabBarStyle: originalTabBarStyle });
         }
         
         if (rootNavigator) {
-          rootNavigator.setOptions({
-            tabBarStyle: originalTabBarStyle
-          });
+          rootNavigator.setOptions({ tabBarStyle: originalTabBarStyle });
         }
         
         if (tabNavigator) {
-          tabNavigator.setOptions({
-            tabBarStyle: originalTabBarStyle
-          });
+          tabNavigator.setOptions({ tabBarStyle: originalTabBarStyle });
         }
         
         try {
@@ -304,9 +327,10 @@ export default function VideoScreen(): React.JSX.Element {
           console.log('Navigation cleanup error:', error);
         }
         
+        // Platform-specific cleanup
         if (Platform.OS === 'android') {
           NavigationBar.setVisibilityAsync('visible').catch(console.log);
-          NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(console.log);
+          NavigationBar.setBackgroundColorAsync(theme.colors.surface).catch(console.log);
         }
         
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(console.log);
@@ -315,9 +339,10 @@ export default function VideoScreen(): React.JSX.Element {
           setIsFullscreen(false);
         }
       };
-    }, [isFullscreen, navigation])
+    }, [isFullscreen, navigation, isDark, theme])
   );
 
+  // Mobile-optimized video control handlers
   const handlePlayPause = useCallback((): void => {
     if (player.playing) {
       player.pause();
@@ -348,14 +373,54 @@ export default function VideoScreen(): React.JSX.Element {
     setShowControls(true);
   }, [isFullscreen]);
 
+  // Enhanced video loading with asset validation for mobile development
   const loadVideo = useCallback(async (videoIndex: number): Promise<void> => {
     try {
+      if (videoIndex >= sampleVideos.length || videoIndex < 0) {
+        throw new Error('Invalid video index');
+      }
+
+      const selectedVideo = sampleVideos[videoIndex];
+      
+      // Validate video source exists
+      if (!selectedVideo.source) {
+        throw new Error('Video source not found');
+      }
+
       setCurrentVideoIndex(videoIndex);
       setShowControls(true);
-      await player.replace(sampleVideos[videoIndex].source);
+      
+      console.log(`📱 Loading video: ${selectedVideo.title}`);
+      await player.replace(selectedVideo.source);
+      
     } catch (error) {
-      console.log('Error loading video:', error);
-      Alert.alert('Error', `Failed to load video: ${sampleVideos[videoIndex].title}`);
+      console.log('❌ Video loading error:', error);
+      
+      // Mobile-friendly error handling with specific messaging
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Unknown error occurred';
+        
+      Alert.alert(
+        'Video Error', 
+        `Failed to load video: ${sampleVideos[videoIndex]?.title || 'Unknown video'}\n\nError: ${errorMessage}`,
+        [
+          { 
+            text: 'Try Again', 
+            onPress: () => {
+              // Retry loading the same video
+              if (videoIndex < sampleVideos.length) {
+                loadVideo(videoIndex);
+              }
+            },
+            style: 'default' 
+          },
+          { 
+            text: 'Cancel', 
+            style: 'cancel' 
+          }
+        ]
+      );
     }
   }, [player, sampleVideos]);
 
@@ -366,6 +431,113 @@ export default function VideoScreen(): React.JSX.Element {
   // Check if device is in landscape orientation
   const isLandscape = orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT || 
                      orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+
+  // Create dynamic styles based on theme for cross-platform consistency
+  const dynamicStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      backgroundColor: theme.colors.surface,
+      paddingTop: 60,
+      paddingBottom: 24,
+      paddingHorizontal: 24,
+      alignItems: 'center',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+      ...Platform.select({
+        ios: {
+          shadowColor: theme.colors.shadow,
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 1,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    headerIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: theme.colors.secondary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    themeToggle: {
+      position: 'absolute',
+      top: 60,
+      right: 24,
+      padding: 12,
+      borderRadius: 24,
+      backgroundColor: theme.colors.secondary,
+      minWidth: 48,
+      minHeight: 48,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playlistSection: {
+      backgroundColor: theme.colors.surface,
+      marginHorizontal: 16,
+      marginBottom: 32,
+      borderRadius: 12,
+      padding: 20,
+      ...Platform.select({
+        ios: {
+          shadowColor: theme.colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isDark ? 0.3 : 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 3,
+        },
+      }),
+    },
+    playlistItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+      minHeight: 60,
+    },
+    activePlaylistItem: {
+      backgroundColor: theme.colors.secondary,
+      borderRadius: 8,
+      marginHorizontal: -8,
+      paddingHorizontal: 12,
+    },
+    playlistThumbnail: {
+      width: 48,
+      height: 48,
+      borderRadius: 8,
+      backgroundColor: theme.colors.secondary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    activePlaylistThumbnail: {
+      backgroundColor: theme.colors.primary,
+    },
+    playlistTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 4,
+    },
+    activePlaylistTitle: {
+      color: theme.colors.primary,
+    },
+    playlistDescription: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+  });
 
   // Responsive fullscreen video player with proper dimensions
   const FullscreenVideoPlayer = () => (
@@ -455,16 +627,33 @@ export default function VideoScreen(): React.JSX.Element {
     return <FullscreenVideoPlayer />;
   }
 
-  // Normal mode with full UI
+  // Normal mode with themed UI using new components
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Camera size={32} color="#007AFF" strokeWidth={2} />
+    <ThemedView style={dynamicStyles.container}>
+      <ThemedView surface style={dynamicStyles.header}>
+        <TouchableOpacity 
+          style={dynamicStyles.themeToggle}
+          onPress={() => {
+            console.log('🔘 Theme toggle pressed! Current isDark:', isDark);
+            toggleTheme();
+          }}
+          activeOpacity={0.7}
+          accessibilityLabel={isDark ? "Switch to light theme" : "Switch to dark theme"}
+          accessibilityRole="button"
+        >
+          {isDark ? (
+            <Sun size={24} color={theme.colors.primary} strokeWidth={2} />
+          ) : (
+            <Moon size={24} color={theme.colors.primary} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
+        
+        <View style={dynamicStyles.headerIcon}>
+          <Camera size={32} color={theme.colors.primary} strokeWidth={2} />
         </View>
-        <Text style={styles.headerTitle}>Gardi Stream</Text>
-        <Text style={styles.headerSubtitle}>Video Library</Text>
-      </View>
+        <ThemedText type="title">Gardi Stream</ThemedText>
+        <ThemedText type="secondary">Video Library</ThemedText>
+      </ThemedView>
 
       <ScrollView 
         style={styles.content} 
@@ -545,15 +734,15 @@ export default function VideoScreen(): React.JSX.Element {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.playlistSection}>
-          <Text style={styles.sectionTitle}>Available Videos</Text>
+        <ThemedView surface style={dynamicStyles.playlistSection}>
+          <ThemedText type="title">Available Videos</ThemedText>
           
           {sampleVideos.map((videoItem: VideoItem, index: number) => (
             <TouchableOpacity 
               key={videoItem.id} 
               style={[
-                styles.playlistItem,
-                currentVideoIndex === index && styles.activePlaylistItem
+                dynamicStyles.playlistItem,
+                currentVideoIndex === index && dynamicStyles.activePlaylistItem
               ]}
               onPress={() => loadVideo(index)}
               activeOpacity={0.7}
@@ -561,78 +750,39 @@ export default function VideoScreen(): React.JSX.Element {
               accessibilityRole="button"
             >
               <View style={[
-                styles.playlistThumbnail,
-                currentVideoIndex === index && styles.activePlaylistThumbnail
+                dynamicStyles.playlistThumbnail,
+                currentVideoIndex === index && dynamicStyles.activePlaylistThumbnail
               ]}>
                 <VideoIcon 
                   size={24} 
-                  color={currentVideoIndex === index ? "#FFFFFF" : "#007AFF"} 
+                  color={currentVideoIndex === index ? "#FFFFFF" : theme.colors.primary} 
                   strokeWidth={2} 
                 />
               </View>
               <View style={styles.playlistInfo}>
-                <Text style={[
-                  styles.playlistTitle,
-                  currentVideoIndex === index && styles.activePlaylistTitle
-                ]}>
+                <ThemedText 
+                  type="subtitle"
+                  style={[
+                    dynamicStyles.playlistTitle,
+                    currentVideoIndex === index && dynamicStyles.activePlaylistTitle
+                  ]}
+                >
                   {videoItem.title}
-                </Text>
-                <Text style={styles.playlistDescription}>
+                </ThemedText>
+                <ThemedText type="secondary" style={dynamicStyles.playlistDescription}>
                   {videoItem.description}
-                </Text>
+                </ThemedText>
               </View>
             </TouchableOpacity>
           ))}
-        </View>
+        </ThemedView>
       </ScrollView>
-    </View>
+    </ThemedView>
   );
 }
 
+// Static styles that don't change with theme for performance optimization
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 1,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1D1D1F',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6E6E73',
-  },
   content: {
     flex: 1,
   },
@@ -691,7 +841,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Responsive fullscreen styles with proper dimensions
   fullscreenContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -720,71 +869,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playlistSection: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 32,
-    borderRadius: 12,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1D1D1F',
-    marginBottom: 16,
-  },
-  playlistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F0F0',
-    minHeight: 60,
-  },
-  activePlaylistItem: {
-    backgroundColor: '#F0F8FF',
-    borderRadius: 8,
-    marginHorizontal: -8,
-    paddingHorizontal: 12,
-  },
-  playlistThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activePlaylistThumbnail: {
-    backgroundColor: '#007AFF',
-  },
   playlistInfo: {
     flex: 1,
-  },
-  playlistTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1D1D1F',
-    marginBottom: 4,
-  },
-  activePlaylistTitle: {
-    color: '#007AFF',
-  },
-  playlistDescription: {
-    fontSize: 14,
-    color: '#6E6E73',
   },
 });
