@@ -1,4 +1,4 @@
-package com.mcryholdings.gardi
+package com.garditech.gardi
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

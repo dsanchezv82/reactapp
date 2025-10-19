@@ -12,6 +12,7 @@ interface User {
   lastName: string;
   username: string;
   role: string;
+  createdAt: string;
 }
 
 interface AuthContextType {

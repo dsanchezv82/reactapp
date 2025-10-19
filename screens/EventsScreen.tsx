@@ -1,13 +1,13 @@
-import { AlertCircle, Calendar, Clock, MapPin, Moon, Sun, Users } from 'lucide-react-native';
+import { AlertCircle, Calendar, Clock, MapPin, Users } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Platform,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -49,7 +49,7 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'attending' | 'upcoming'>('all');
 
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { user, authToken } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -312,13 +312,6 @@ export default function EventsScreen() {
       <ThemedView style={dynamicStyles.container}>
         <View style={dynamicStyles.header}>
           <ThemedText type="title">Events</ThemedText>
-          <TouchableOpacity onPress={toggleTheme} activeOpacity={0.7}>
-            {isDark ? (
-              <Sun size={24} color={theme.colors.primary} strokeWidth={2} />
-            ) : (
-              <Moon size={24} color={theme.colors.primary} strokeWidth={2} />
-            )}
-          </TouchableOpacity>
         </View>
         <View style={dynamicStyles.emptyContainer}>
           <Calendar size={48} color={theme.colors.textSecondary} strokeWidth={1.5} />
@@ -332,16 +325,9 @@ export default function EventsScreen() {
 
   return (
     <ThemedView style={dynamicStyles.container}>
-      {/* Header with theme toggle */}
+      {/* Header */}
       <View style={dynamicStyles.header}>
         <ThemedText type="title">Events</ThemedText>
-        <TouchableOpacity onPress={toggleTheme} activeOpacity={0.7}>
-          {isDark ? (
-            <Sun size={24} color={theme.colors.primary} strokeWidth={2} />
-          ) : (
-            <Moon size={24} color={theme.colors.primary} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
       </View>
 
       {/* Filter buttons for enhanced mobile UX */}

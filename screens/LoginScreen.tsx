@@ -27,6 +27,7 @@ export default function LoginScreen() {
   const [checkingBiometric, setCheckingBiometric] = useState(true);
   const [biometricSwitchError, setBiometricSwitchError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { theme } = useTheme();
   const { login } = useAuth();
@@ -57,9 +58,13 @@ export default function LoginScreen() {
     setIsLoggingIn(true);
 
     console.log('📱 Attempting backend login...');
+    console.log('📧 Email:', email);
+    console.log('🔑 Password length:', password.length);
     
     // Use AuthContext login with backend authentication
     const result = await login(email, password);
+    
+    console.log('🔍 Login result:', result);
     
     if (result.success) {
       console.log('✅ Backend login successful - navigating to app...');
@@ -81,6 +86,7 @@ export default function LoginScreen() {
       }
     } else {
       // Display backend error to user
+      console.log('❌ Login failed with error:', result.error);
       setError(result.error || 'Login failed');
       setIsLoggingIn(false);
     }
@@ -198,6 +204,29 @@ export default function LoginScreen() {
       backgroundColor: theme.colors.surface,
       color: theme.colors.text,
     },
+    passwordContainer: {
+      width: '100%',
+      position: 'relative',
+      marginBottom: 16,
+    },
+    passwordInput: {
+      width: '100%',
+      height: 48,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingRight: 48,
+      fontSize: 16,
+      backgroundColor: theme.colors.surface,
+      color: theme.colors.text,
+    },
+    passwordToggle: {
+      position: 'absolute',
+      right: 12,
+      top: 12,
+      padding: 4,
+    },
     biometricButton: {
       borderWidth: 1,
       borderColor: theme.colors.primary,
@@ -283,17 +312,28 @@ export default function LoginScreen() {
         editable={!isLoggingIn}
       />
       
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder="Password"
-        placeholderTextColor={theme.colors.textSecondary}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        textContentType="password"
-        autoComplete="password"
-        editable={!isLoggingIn}
-      />
+      <View style={dynamicStyles.passwordContainer}>
+        <TextInput
+          style={dynamicStyles.passwordInput}
+          placeholder="Password"
+          placeholderTextColor={theme.colors.textSecondary}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          textContentType="password"
+          autoComplete="password"
+          editable={!isLoggingIn}
+        />
+        <TouchableOpacity 
+          style={dynamicStyles.passwordToggle}
+          onPress={() => setShowPassword(!showPassword)}
+          activeOpacity={0.7}
+        >
+          <ThemedText style={{ fontSize: 12, fontWeight: '600' }}>
+            {showPassword ? 'Hide' : 'Show'}
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
       
       {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
 

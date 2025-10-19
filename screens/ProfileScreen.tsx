@@ -1,9 +1,13 @@
 import { LogOut, Settings, Shield, User } from 'lucide-react-native';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ThemedText from '../components/ThemedText';
+import ThemedView from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function ProfileScreen() {
   const { logout, user } = useAuth();
+  const { theme, isDark } = useTheme();
 
   const handleLogout = async () => {
     Alert.alert(
@@ -32,78 +36,74 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <User size={60} color="#007AFF" strokeWidth={1.5} />
+    <ThemedView style={styles.container}>
+      <ThemedView surface style={styles.header}>
+        <View style={[styles.avatarContainer, { backgroundColor: theme.colors.secondary }]}>
+          <User size={60} color={theme.colors.primary} strokeWidth={1.5} />
         </View>
-        <Text style={styles.username}>DS</Text>
-        <Text style={styles.email}>dsanchez@garditech.com</Text>
-      </View>
+        <ThemedText type="title" style={styles.username}>DS</ThemedText>
+        <ThemedText type="secondary" style={styles.email}>dsanchez@garditech.com</ThemedText>
+      </ThemedView>
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <ThemedText type="secondary" style={styles.sectionTitle}>Account</ThemedText>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Shield size={20} color="#6E6E73" strokeWidth={2} />
-            <Text style={styles.menuItemText}>Security Settings</Text>
-            <Text style={styles.menuItemArrow}>›</Text>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
+            <Shield size={20} color={theme.colors.textSecondary} strokeWidth={2} />
+            <ThemedText style={styles.menuItemText}>Security Settings</ThemedText>
+            <ThemedText type="secondary" style={styles.menuItemArrow}>›</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Settings size={20} color="#6E6E73" strokeWidth={2} />
-            <Text style={styles.menuItemText}>App Settings</Text>
-            <Text style={styles.menuItemArrow}>›</Text>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
+            <Settings size={20} color={theme.colors.textSecondary} strokeWidth={2} />
+            <ThemedText style={styles.menuItemText}>App Settings</ThemedText>
+            <ThemedText type="secondary" style={styles.menuItemArrow}>›</ThemedText>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
+          <ThemedText type="secondary" style={styles.sectionTitle}>Support</ThemedText>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Help Center</Text>
-            <Text style={styles.menuItemArrow}>›</Text>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
+            <ThemedText style={styles.menuItemText}>Help Center</ThemedText>
+            <ThemedText type="secondary" style={styles.menuItemArrow}>›</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Contact Support</Text>
-            <Text style={styles.menuItemArrow}>›</Text>
+          <TouchableOpacity style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}>
+            <ThemedText style={styles.menuItemText}>Contact Support</ThemedText>
+            <ThemedText type="secondary" style={styles.menuItemArrow}>›</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: theme.colors.error }]} onPress={handleLogout}>
           <LogOut size={20} color="#FFFFFF" strokeWidth={2} />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
         
-        <Text style={styles.versionText}>Gardi v1.0.0</Text>
+        <ThemedText type="secondary" style={styles.versionText}>Gardi v1.0.0</ThemedText>
       </View>
-    </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
   },
   header: {
-    backgroundColor: '#FFFFFF',
     paddingTop: 60,
     paddingBottom: 24,
     paddingHorizontal: 24,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
   avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F0F8FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -111,19 +111,16 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1D1D1F',
     marginBottom: 4,
   },
   email: {
     fontSize: 16,
-    color: '#6E6E73',
   },
   content: {
     flex: 1,
     paddingTop: 24,
   },
   section: {
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 12,
@@ -132,7 +129,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6E6E73',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: 16,
@@ -144,17 +140,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   menuItemText: {
     flex: 1,
     fontSize: 16,
-    color: '#1D1D1F',
     marginLeft: 12,
   },
   menuItemArrow: {
     fontSize: 20,
-    color: '#C7C7CC',
     fontWeight: '300',
   },
   footer: {
@@ -163,7 +156,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutButton: {
-    backgroundColor: '#FF3B30',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -181,7 +173,6 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 14,
-    color: '#6E6E73',
     textAlign: 'center',
   },
 });

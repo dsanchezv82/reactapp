@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance } from 'react-native';
 
@@ -59,8 +58,6 @@ const darkTheme: Theme = {
 interface ThemeContextType {
   theme: Theme;
   isDark: boolean;
-  toggleTheme: () => void;
-  setTheme: (isDark: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -77,49 +74,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isDark, setIsDark] = useState<boolean>(false);
 
   useEffect(() => {
-    loadThemePreference();
+    // Set initial theme based on system appearance
+    const systemTheme = Appearance.getColorScheme();
+    const initialIsDark = systemTheme === 'dark';
+    setIsDark(initialIsDark);
+    console.log('🎨 ThemeProvider mounted');
+    console.log('🎨 System color scheme:', systemTheme);
+    console.log('🎨 Initial isDark state:', initialIsDark);
+
+    // Listen for system appearance changes
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      console.log('🔔 Appearance change detected!');
+      console.log('🎨 New color scheme:', colorScheme);
+      const isDarkMode = colorScheme === 'dark';
+      setIsDark(isDarkMode);
+      console.log('🎨 Updated isDark state to:', isDarkMode);
+    });
+
+    // Cleanup listener on unmount
+    return () => {
+      console.log('🎨 ThemeProvider unmounting, removing listener');
+      subscription.remove();
+    };
   }, []);
-
-  const loadThemePreference = async () => {
-    try {
-      const savedTheme = await AsyncStorage.getItem('@gardi_theme');
-      if (savedTheme !== null) {
-        const isDarkMode = savedTheme === 'dark';
-        setIsDark(isDarkMode);
-        console.log('🎨 LOADED THEME:', isDarkMode ? 'DARK MODE' : 'LIGHT MODE');
-      } else {
-        const systemTheme = Appearance.getColorScheme();
-        const isDarkMode = systemTheme === 'dark';
-        setIsDark(isDarkMode);
-        console.log('🎨 SYSTEM THEME:', isDarkMode ? 'DARK MODE' : 'LIGHT MODE');
-      }
-    } catch (error) {
-      console.log('❌ Theme load error:', error);
-      setIsDark(false);
-    }
-  };
-
-  const saveThemePreference = async (darkMode: boolean) => {
-    try {
-      await AsyncStorage.setItem('@gardi_theme', darkMode ? 'dark' : 'light');
-      console.log('💾 THEME SAVED:', darkMode ? 'DARK MODE' : 'LIGHT MODE');
-    } catch (error) {
-      console.log('❌ Theme save error:', error);
-    }
-  };
-
-  const toggleTheme = () => {
-    const newIsDark = !isDark;
-    console.log('🔄 THEME TOGGLE:', isDark ? 'DARK' : 'LIGHT', '→', newIsDark ? 'DARK' : 'LIGHT');
-    setIsDark(newIsDark);
-    saveThemePreference(newIsDark);
-  };
-
-  const setTheme = (darkMode: boolean) => {
-    console.log('🎯 SET THEME:', darkMode ? 'DARK MODE' : 'LIGHT MODE');
-    setIsDark(darkMode);
-    saveThemePreference(darkMode);
-  };
 
   const theme = isDark ? darkTheme : lightTheme;
 
@@ -132,7 +109,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, isDark }}>
       {children}
     </ThemeContext.Provider>
   );

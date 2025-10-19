@@ -6,11 +6,9 @@ import {
   Camera,
   Maximize,
   Minimize,
-  Moon,
   Pause,
   Play,
   RotateCcw,
-  Sun,
   Video as VideoIcon,
   Volume2,
   VolumeX
@@ -63,7 +61,7 @@ export default function VideoScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const parentNavigator = useRef<any>(null);
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   // Debug theme state for mobile development
   useEffect(() => {
@@ -631,22 +629,6 @@ export default function VideoScreen(): React.JSX.Element {
   return (
     <ThemedView style={dynamicStyles.container}>
       <ThemedView surface style={dynamicStyles.header}>
-        <TouchableOpacity 
-          style={dynamicStyles.themeToggle}
-          onPress={() => {
-            console.log('🔘 Theme toggle pressed! Current isDark:', isDark);
-            toggleTheme();
-          }}
-          activeOpacity={0.7}
-          accessibilityLabel={isDark ? "Switch to light theme" : "Switch to dark theme"}
-          accessibilityRole="button"
-        >
-          {isDark ? (
-            <Sun size={24} color={theme.colors.primary} strokeWidth={2} />
-          ) : (
-            <Moon size={24} color={theme.colors.primary} strokeWidth={2} />
-          )}
-        </TouchableOpacity>
         
         <View style={dynamicStyles.headerIcon}>
           <Camera size={32} color={theme.colors.primary} strokeWidth={2} />

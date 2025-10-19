@@ -1,11 +1,15 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Search } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import ThemedText from '../components/ThemedText';
+import ThemedView from '../components/ThemedView';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isScreenFocused, setIsScreenFocused] = useState(false);
+  const { theme, isDark } = useTheme();
 
   useFocusEffect(
     React.useCallback(() => {
@@ -18,67 +22,64 @@ export default function SearchScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
-      </View>
+    <ThemedView style={styles.container}>
+      <ThemedView surface style={styles.header}>
+        <ThemedText type="title" style={styles.title}>Search</ThemedText>
+      </ThemedView>
       
       <View style={styles.searchContainer}>
         <View style={[
           styles.searchInputContainer,
-          isScreenFocused && styles.searchInputFocused
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          isScreenFocused && { borderColor: theme.colors.primary }
         ]}>
           <Search 
             size={20} 
-            color="#8E8E93" 
+            color={theme.colors.textSecondary} 
             strokeWidth={2}
             style={styles.searchIcon}
           />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#8E8E93"
+            placeholderTextColor={theme.colors.textSecondary}
           />
         </View>
       </View>
 
       <ScrollView style={styles.content}>
-        <Text style={styles.subtitle}>
+        <ThemedText type="secondary" style={styles.subtitle}>
           {isScreenFocused ? 'Screen is active' : 'Screen is inactive'}
-        </Text>
+        </ThemedText>
         {searchQuery ? (
-          <Text style={styles.searchResults}>
+          <ThemedText style={styles.searchResults}>
             Searching for: "{searchQuery}"
-          </Text>
+          </ThemedText>
         ) : (
-          <Text style={styles.placeholder}>
+          <ThemedText type="secondary" style={styles.placeholder}>
             Start typing to search...
-          </Text>
+          </ThemedText>
         )}
       </ScrollView>
-    </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000',
   },
   searchContainer: {
     paddingHorizontal: 20,
@@ -87,16 +88,10 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  searchInputFocused: {
-    borderColor: '#007AFF',
-    backgroundColor: '#fff',
   },
   searchIcon: {
     marginRight: 12,
@@ -104,7 +99,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
   },
   content: {
     flex: 1,
@@ -112,13 +106,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#007AFF',
     marginBottom: 16,
     fontWeight: '600',
   },
   searchResults: {
     fontSize: 16,
-    color: '#000',
     marginBottom: 8,
   },
   placeholder: {
