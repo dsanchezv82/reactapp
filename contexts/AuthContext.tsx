@@ -13,6 +13,8 @@ interface User {
   username: string;
   role: string;
   createdAt: string;
+  familyId?: number;
+  imei?: string | null;
 }
 
 interface AuthContextType {
@@ -105,30 +107,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const data = await response.json();
-      console.log('📱 Secure domain response data received');
+      console.log('📱 Login response received:', data);
 
-      if (response.ok && data.authToken && data.user) {
-        // Successful secure domain authentication - mobile storage
-        const { authToken: token, user: userData } = data;
+      if (response.ok) {
+        /**
+         * Backend now returns:
+         * {
+         *   "userId": 36383,
+         *   "familyId": 56028,
+         *   "imei": "865509052362369",
+         *   "jwt": "eyJhbGc..."
+         * }
+         */
         
-        // Validate required user fields for mobile app
-        if (!userData.userId || !userData.email) {
-          console.log('❌ Invalid user data from secure domain:', userData);
+        const token = data.jwt || data.authToken;
+        
+        if (!token) {
+          console.log('❌ No JWT token in response');
           return { 
             success: false, 
-            error: 'Invalid user data received from server.' 
+            error: 'Server did not return authentication token.' 
+          };
+        }
+
+        // Construct user data from response and JWT payload
+        let userData = null;
+        
+        try {
+          // Decode JWT to get additional user info
+          const tokenParts = token.split('.');
+          if (tokenParts.length === 3) {
+            const base64Payload = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const paddedPayload = base64Payload.padEnd(
+              base64Payload.length + (4 - (base64Payload.length % 4)) % 4,
+              '='
+            );
+            const decodedPayload = JSON.parse(atob(paddedPayload));
+            
+            console.log('🔓 Decoded JWT payload:', decodedPayload);
+            
+            // Build user object from response and JWT
+            userData = {
+              userId: String(data.userId || decodedPayload.userId),
+              email: email, // Use the email they logged in with
+              role: decodedPayload.surfsightRole || decodedPayload.role || 'user',
+              firstName: data.firstName || decodedPayload.firstName || '',
+              lastName: data.lastName || decodedPayload.lastName || '',
+              username: data.username || decodedPayload.username || email,
+              createdAt: data.createdAt || decodedPayload.createdAt || new Date().toISOString(),
+              familyId: data.familyId || decodedPayload.familyId,
+              imei: data.imei || null
+            };
+            
+            console.log('✅ User data constructed:', userData);
+          }
+        } catch (error) {
+          console.log('❌ Failed to decode JWT token:', error);
+          return { 
+            success: false, 
+            error: 'Invalid token format received from server.' 
           };
         }
         
-        await AsyncStorage.setItem('@gardi_auth_token', token);
-        await AsyncStorage.setItem('@gardi_user_data', JSON.stringify(userData));
-        
-        setAuthToken(token);
-        setUser(userData);
-        setIsAuthenticated(true);
-        
-        console.log('✅ Secure domain authentication successful:', userData.email);
-        return { success: true };
+        if (token && userData) {
+          // Validate required user fields for mobile app
+          if (!userData.userId || !userData.email) {
+            console.log('❌ Invalid user data:', userData);
+            return { 
+              success: false, 
+              error: 'Invalid user data received from server.' 
+            };
+          }
+          
+          // Store authentication data
+          await AsyncStorage.setItem('@gardi_auth_token', token);
+          await AsyncStorage.setItem('@gardi_user_data', JSON.stringify(userData));
+          
+          setAuthToken(token);
+          setUser(userData);
+          setIsAuthenticated(true);
+          
+          console.log('✅ Authentication successful:', userData.email);
+          console.log('📱 User ID:', userData.userId);
+          console.log('📱 Family ID:', userData.familyId);
+          console.log('📱 IMEI:', userData.imei);
+          
+          return { success: true };
+        } else {
+          console.log('❌ Missing token or user data');
+          return { 
+            success: false, 
+            error: 'Server did not return complete authentication data. Please contact support.' 
+          };
+        }
         
       } else {
         // Handle secure domain authentication errors
@@ -216,7 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       logout, 
       loading, 
-      authToken 
+      authToken
     }}>
       {children}
     </AuthContext.Provider>

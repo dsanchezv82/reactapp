@@ -1,68 +1,75 @@
-import { AlertCircle, Calendar, Clock, MapPin, Users } from 'lucide-react-native';
+import { AlertTriangle, Calendar, Clock, MapPin, Video } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Platform,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Import themed components following mobile best practices
+// Import themed components
 import ThemedText from '../components/ThemedText';
 import ThemedView from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-// Backend API configuration - secure production domain
-const API_BASE_URL = 'https://api.garditech.com/api'; // Match AuthContext configuration
+// Backend API configuration
+const API_BASE_URL = 'https://api.garditech.com/api';
 
-// Mobile-optimized event interface for backend integration
-interface Event {
+// Event interface matching Surfsight API response
+interface DeviceEvent {
   id: string;
-  title: string;
-  description: string;
-  startTime: string;
-  endTime: string;
-  location: string;
-  attendees: number;
-  maxAttendees?: number;
-  category: 'safety' | 'training' | 'community' | 'maintenance';
-  isUserAttending: boolean;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
+  eventType: string;
+  timestamp: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  description?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  duration?: number;
+  speed?: number;
+  metadata?: Record<string, any>;
 }
 
 export default function EventsScreen() {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<DeviceEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'attending' | 'upcoming'>('all');
+  const [filter, setFilter] = useState<'all' | 'critical' | 'today'>('all');
 
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { user, authToken } = useAuth();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadEvents();
-  }, []);
+    if (user?.imei) {
+      loadEvents();
+    }
+  }, [user?.imei]);
 
-  // Load events from backend with proper authentication
+  // Load events from backend with device IMEI
   const loadEvents = async () => {
+    if (!user?.imei) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      console.log('🔄 Loading events from backend...');
+      console.log('🔄 Loading device events for IMEI:', user.imei);
+      console.log('🔑 Auth token:', authToken ? 'Present' : 'Missing');
+      console.log('📍 API URL:', `${API_BASE_URL}/events/${user.imei}`);
       
-      const response = await fetch(`${API_BASE_URL}/events`, {
+      const response = await fetch(`${API_BASE_URL}/events/${user.imei}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -70,197 +77,203 @@ export default function EventsScreen() {
         },
       });
 
-      const data: ApiResponse<Event[]> = await response.json();
+      console.log('📡 Events response status:', response.status);
+      console.log('📡 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
 
-      if (response.ok && data.success) {
-        setEvents(data.data || []);
-        console.log('✅ Events loaded successfully:', data.data?.length || 0);
+      const responseText = await response.text();
+      console.log('📦 Raw response:', responseText.substring(0, 500)); // First 500 chars
+
+      if (response.ok) {
+        const data = JSON.parse(responseText);
+        console.log('📦 Full response data:', JSON.stringify(data, null, 2));
+        console.log('📦 Data type:', typeof data);
+        console.log('📦 Is array?', Array.isArray(data));
+        console.log('📦 Data keys:', Object.keys(data || {}));
+        
+        const eventsList = data.events || data.data || (Array.isArray(data) ? data : []);
+        setEvents(eventsList);
+        console.log('✅ Events loaded successfully:', eventsList.length);
+        console.log('✅ First event:', eventsList[0] ? JSON.stringify(eventsList[0], null, 2) : 'No events');
       } else {
-        console.log('❌ Failed to load events:', data.error);
-        Alert.alert('Error', data.error || 'Failed to load events');
+        const errorData = JSON.parse(responseText || '{}');
+        console.log('❌ Failed to load events:', errorData);
+        Alert.alert('Error', errorData.error || errorData.message || 'Failed to load events');
         setEvents([]);
       }
     } catch (error) {
       console.log('❌ Network error loading events:', error);
-      Alert.alert(
-        'Network Error', 
-        'Unable to connect to server. Please check your internet connection and try again.'
-      );
+      Alert.alert('Error', 'Failed to load events. Please try again.');
       setEvents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Pull-to-refresh functionality for mobile UX
+  // Pull-to-refresh functionality
   const onRefresh = async () => {
     setRefreshing(true);
     await loadEvents();
     setRefreshing(false);
   };
 
-  // Toggle event attendance with backend sync
-  const toggleAttendance = async (eventId: string) => {
+  // Fetch individual event details
+  const fetchEventDetails = async (eventId: string) => {
+    if (!user?.imei) return;
+
     try {
-      console.log('🔄 Toggling attendance for event:', eventId);
+      console.log('🔄 Loading event details:', eventId);
       
-      const response = await fetch(`${API_BASE_URL}/events/${eventId}/attendance`, {
-        method: 'PATCH',
+      const response = await fetch(`${API_BASE_URL}/events/${user.imei}/${eventId}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`,
         },
       });
 
-      const data: ApiResponse<{ isAttending: boolean; attendeeCount: number }> = await response.json();
-
-      if (response.ok && data.success) {
-        // Update local state with backend response
-        setEvents(prev =>
-          prev.map(event =>
-            event.id === eventId
-              ? {
-                  ...event,
-                  isUserAttending: data.data!.isAttending,
-                  attendees: data.data!.attendeeCount
-                }
-              : event
-          )
-        );
-        console.log('✅ Attendance updated successfully');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Event details loaded:', data);
+        // Handle event details (could open a modal or navigate to detail screen)
+        Alert.alert('Event Details', JSON.stringify(data, null, 2));
       } else {
-        console.log('❌ Failed to update attendance:', data.error);
-        Alert.alert('Error', data.error || 'Failed to update attendance');
+        Alert.alert('Error', 'Failed to load event details');
       }
     } catch (error) {
-      console.log('❌ Network error updating attendance:', error);
-      Alert.alert('Network Error', 'Failed to update attendance. Please try again.');
+      console.log('❌ Error loading event details:', error);
+      Alert.alert('Error', 'Failed to load event details');
     }
   };
 
-  // Cross-platform category icons following mobile design guidelines
-  const getCategoryIcon = (category: Event['category']) => {
-    switch (category) {
-      case 'safety':
-        return <AlertCircle size={20} color="#FF3B30" strokeWidth={2} />;
-      case 'training':
-        return <Calendar size={20} color="#007AFF" strokeWidth={2} />;
-      case 'community':
-        return <Users size={20} color="#34C759" strokeWidth={2} />;
-      case 'maintenance':
-        return <Calendar size={20} color="#FF9500" strokeWidth={2} />;
+  // Get severity icon and color
+  const getSeverityInfo = (severity?: string) => {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+        return { color: '#FF3B30', icon: '🚨' };
+      case 'high':
+        return { color: '#FF9500', icon: '⚠️' };
+      case 'medium':
+        return { color: '#FFCC00', icon: '⚡' };
+      case 'low':
+        return { color: '#34C759', icon: 'ℹ️' };
       default:
-        return <Calendar size={20} color={theme.colors.primary} strokeWidth={2} />;
+        return { color: theme.colors.textSecondary, icon: '📍' };
     }
   };
 
-  // Mobile-optimized time formatting
-  const formatEventTime = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+  // Format timestamp
+  const formatEventTime = (timestamp: string) => {
+    const date = new Date(timestamp);
     const now = new Date();
     
-    const isToday = start.toDateString() === now.toDateString();
-    const isTomorrow = start.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
+    const isToday = date.toDateString() === now.toDateString();
+    const isYesterday = date.toDateString() === new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString();
     
     let dateStr = '';
     if (isToday) dateStr = 'Today';
-    else if (isTomorrow) dateStr = 'Tomorrow';
-    else dateStr = start.toLocaleDateString();
+    else if (isYesterday) dateStr = 'Yesterday';
+    else dateStr = date.toLocaleDateString();
     
-    const timeStr = `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     return `${dateStr} • ${timeStr}`;
   };
 
-  // Client-side filtering for optimal mobile performance
+  // Filter events
   const getFilteredEvents = () => {
     const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
     switch (filter) {
-      case 'attending':
-        return events.filter(event => event.isUserAttending);
-      case 'upcoming':
-        return events.filter(event => new Date(event.startTime) > now);
+      case 'critical':
+        return events.filter(event => 
+          event.severity?.toLowerCase() === 'critical' || event.severity?.toLowerCase() === 'high'
+        );
+      case 'today':
+        return events.filter(event => new Date(event.timestamp) >= todayStart);
       default:
-        return events.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
   };
 
-  // Cross-platform event card component
-  const renderEvent = ({ item }: { item: Event }) => (
-    <TouchableOpacity
-      style={[
-        styles.eventItem,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-        }
-      ]}
-      activeOpacity={0.7}
-    >
-      <View style={styles.eventContent}>
-        <View style={styles.eventHeader}>
-          {getCategoryIcon(item.category)}
-          <View style={styles.eventInfo}>
-            <ThemedText type="subtitle" style={styles.eventTitle}>
-              {item.title}
-            </ThemedText>
-            <View style={styles.eventMeta}>
-              <Clock size={14} color={theme.colors.textSecondary} strokeWidth={2} />
-              <ThemedText type="secondary" style={styles.eventTime}>
-                {formatEventTime(item.startTime, item.endTime)}
-              </ThemedText>
-            </View>
-          </View>
-          {item.isUserAttending && (
-            <View style={[styles.attendingBadge, { backgroundColor: theme.colors.primary }]}>
-              <ThemedText style={styles.attendingText}>Going</ThemedText>
-            </View>
-          )}
-        </View>
+  // Render event card
+  const renderEvent = ({ item }: { item: DeviceEvent }) => {
+    const severityInfo = getSeverityInfo(item.severity);
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.eventItem,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          }
+        ]}
+        onPress={() => fetchEventDetails(item.id)}
+        activeOpacity={0.7}
+      >
+        {item.thumbnailUrl && (
+          <Image 
+            source={{ uri: item.thumbnailUrl }} 
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        )}
         
-        <ThemedText style={styles.eventDescription}>
-          {item.description}
-        </ThemedText>
-
-        <View style={styles.eventDetails}>
-          <View style={styles.eventLocation}>
-            <MapPin size={14} color={theme.colors.textSecondary} strokeWidth={2} />
-            <ThemedText type="secondary" style={styles.locationText}>
-              {item.location}
-            </ThemedText>
+        <View style={styles.eventContent}>
+          <View style={styles.eventHeader}>
+            <View style={styles.eventInfo}>
+              <View style={styles.eventTitleRow}>
+                <ThemedText type="subtitle" style={styles.eventTitle}>
+                  {item.eventType || 'Event'}
+                </ThemedText>
+                <View style={[styles.severityBadge, { backgroundColor: severityInfo.color + '20' }]}>
+                  <ThemedText style={[styles.severityText, { color: severityInfo.color }]}>
+                    {severityInfo.icon} {item.severity || 'Info'}
+                  </ThemedText>
+                </View>
+              </View>
+              
+              <View style={styles.eventMeta}>
+                <Clock size={14} color={theme.colors.textSecondary} strokeWidth={2} />
+                <ThemedText type="secondary" style={styles.eventTime}>
+                  {formatEventTime(item.timestamp)}
+                </ThemedText>
+              </View>
+            </View>
           </View>
           
-          <View style={styles.eventAttendees}>
-            <Users size={14} color={theme.colors.textSecondary} strokeWidth={2} />
-            <ThemedText type="secondary" style={styles.attendeesText}>
-              {item.attendees}{item.maxAttendees ? `/${item.maxAttendees}` : ''} attending
+          {item.description && (
+            <ThemedText style={styles.eventDescription} numberOfLines={2}>
+              {item.description}
             </ThemedText>
+          )}
+
+          <View style={styles.eventDetails}>
+            {item.location?.address && (
+              <View style={styles.eventLocation}>
+                <MapPin size={14} color={theme.colors.textSecondary} strokeWidth={2} />
+                <ThemedText type="secondary" style={styles.locationText} numberOfLines={1}>
+                  {item.location.address}
+                </ThemedText>
+              </View>
+            )}
+            
+            {item.videoUrl && (
+              <View style={styles.videoIndicator}>
+                <Video size={14} color={theme.colors.primary} strokeWidth={2} />
+                <ThemedText type="secondary" style={[styles.videoText, { color: theme.colors.primary }]}>
+                  Video Available
+                </ThemedText>
+              </View>
+            )}
           </View>
         </View>
+      </TouchableOpacity>
+    );
+  };
 
-        <TouchableOpacity
-          style={[
-            styles.attendButton,
-            item.isUserAttending 
-              ? { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, borderWidth: 1 }
-              : { backgroundColor: theme.colors.primary }
-          ]}
-          onPress={() => toggleAttendance(item.id)}
-          activeOpacity={0.7}
-        >
-          <ThemedText style={[
-            styles.attendButtonText,
-            { color: item.isUserAttending ? theme.colors.primary : '#FFFFFF' }
-          ]}>
-            {item.isUserAttending ? 'Cancel' : 'Attend'}
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Filter button component for clean UI
+  // Filter button component
   const FilterButton = ({ title, filterValue }: { title: string; filterValue: typeof filter }) => (
     <TouchableOpacity
       style={[
@@ -306,7 +319,27 @@ export default function EventsScreen() {
 
   const filteredEvents = getFilteredEvents();
 
-  // Loading state with proper mobile UX
+  // No IMEI state
+  if (!user?.imei) {
+    return (
+      <ThemedView style={dynamicStyles.container}>
+        <View style={dynamicStyles.header}>
+          <ThemedText type="title">Events</ThemedText>
+        </View>
+        <View style={dynamicStyles.emptyContainer}>
+          <AlertTriangle size={48} color={theme.colors.textSecondary} strokeWidth={1.5} />
+          <ThemedText type="title" style={styles.emptyTitle}>
+            No Device Connected
+          </ThemedText>
+          <ThemedText type="secondary" style={styles.emptySubtitle}>
+            Please register a device to view events.
+          </ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  // Loading state
   if (loading) {
     return (
       <ThemedView style={dynamicStyles.container}>
@@ -314,7 +347,7 @@ export default function EventsScreen() {
           <ThemedText type="title">Events</ThemedText>
         </View>
         <View style={dynamicStyles.emptyContainer}>
-          <Calendar size={48} color={theme.colors.textSecondary} strokeWidth={1.5} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <ThemedText type="secondary" style={{ marginTop: 16 }}>
             Loading events...
           </ThemedText>
@@ -330,11 +363,11 @@ export default function EventsScreen() {
         <ThemedText type="title">Events</ThemedText>
       </View>
 
-      {/* Filter buttons for enhanced mobile UX */}
+      {/* Filter buttons */}
       <View style={styles.filterContainer}>
         <FilterButton title="All" filterValue="all" />
-        <FilterButton title="Attending" filterValue="attending" />
-        <FilterButton title="Upcoming" filterValue="upcoming" />
+        <FilterButton title="Critical" filterValue="critical" />
+        <FilterButton title="Today" filterValue="today" />
       </View>
 
       {filteredEvents.length === 0 ? (
@@ -345,10 +378,10 @@ export default function EventsScreen() {
           </ThemedText>
           <ThemedText type="secondary" style={styles.emptySubtitle}>
             {filter === 'all' 
-              ? "No events scheduled at the moment."
-              : filter === 'attending'
-              ? "You're not attending any events yet."
-              : "No upcoming events found."
+              ? "No events recorded for this device."
+              : filter === 'critical'
+              ? "No critical events found."
+              : "No events recorded today."
             }
           </ThemedText>
         </View>
@@ -367,7 +400,6 @@ export default function EventsScreen() {
           }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
-          // Mobile performance optimization
           removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={10}
           windowSize={10}
@@ -377,7 +409,6 @@ export default function EventsScreen() {
   );
 }
 
-// Cross-platform styles following mobile design guidelines
 const styles = StyleSheet.create({
   listContainer: {
     paddingVertical: 8,
@@ -403,6 +434,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -415,20 +447,40 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  thumbnail: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#000',
+  },
   eventContent: {
     padding: 16,
   },
   eventHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   eventInfo: {
     flex: 1,
-    marginLeft: 12,
+  },
+  eventTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   eventTitle: {
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
+  },
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  severityText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   eventMeta: {
     flexDirection: 'row',
@@ -438,49 +490,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
   },
-  attendingBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  attendingText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
   eventDescription: {
-    marginBottom: 16,
+    marginBottom: 12,
     lineHeight: 20,
   },
   eventDetails: {
-    marginBottom: 16,
+    gap: 8,
   },
   eventLocation: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
   locationText: {
     fontSize: 14,
     marginLeft: 6,
+    flex: 1,
   },
-  eventAttendees: {
+  videoIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  attendeesText: {
+  videoText: {
     fontSize: 14,
     marginLeft: 6,
-  },
-  attendButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  attendButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   emptyTitle: {
     marginTop: 16,

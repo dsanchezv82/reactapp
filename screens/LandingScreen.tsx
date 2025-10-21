@@ -1,13 +1,24 @@
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
-import { useEffect, useState } from 'react';
+import { Video } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 // Backend API configuration for real-time map data
 const API_BASE_URL = 'https://api.garditech.com/api';
+
+interface GpsDataPoint {
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+  speed?: number;
+  heading?: number;
+  accuracy?: number;
+}
 
 interface MapLocation {
   id: string;
@@ -25,8 +36,10 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-export default function LandingScreen() {
+export default function LandingScreen({ navigation }: any) {
   const [mapData, setMapData] = useState<MapLocation[]>([]);
+  const [gpsHistory, setGpsHistory] = useState<GpsDataPoint[]>([]);
+  const [lastGpsUpdate, setLastGpsUpdate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{
@@ -42,7 +55,7 @@ export default function LandingScreen() {
   });
   
   const { theme } = useTheme();
-  const { authToken } = useAuth();
+  const { authToken, user } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Request location permissions and get current location
@@ -202,14 +215,32 @@ export default function LandingScreen() {
   };
 
   // Load real-time map data from backend
-  const loadMapData = async () => {
-    if (!authToken) return;
+  // Fetch GPS data from backend
+  const fetchGpsData = async (isBackgroundRefresh: boolean = false) => {
+    if (!authToken || !user?.userId) {
+      console.log('⚠️ Cannot fetch GPS data: missing auth or userId');
+      return;
+    }
     
     try {
-      setLoading(true);
-      console.log('🗺️ Loading real-time map data from backend...');
+      // Only show loading indicator for initial fetch, not for auto-refresh
+      if (!isBackgroundRefresh) {
+        setLoading(true);
+      }
+      console.log('� Fetching GPS data for userId:', user.userId);
       
-      const response = await fetch(`${API_BASE_URL}/map/locations`, {
+      // Get GPS data for the last 24 hours
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+      
+      // Use full ISO 8601 format (date-time) as required by Surfsight API
+      const startStr = startDate.toISOString();
+      const endStr = endDate.toISOString();
+      
+      const url = `${API_BASE_URL}/devices/${user.userId}/gps?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
+      console.log('📡 GPS API URL:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -217,49 +248,145 @@ export default function LandingScreen() {
         },
       });
 
-      // Check if response is JSON before parsing
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        // Backend endpoint doesn't exist yet - this is expected during development
-        console.log('ℹ️ Backend map endpoint not available yet (status:', response.status, ') - using sample data');
-        return;
+      if (!response.ok) {
+        throw new Error(`GPS API error: ${response.status} ${response.statusText}`);
       }
 
-      const data: ApiResponse<MapLocation[]> = await response.json();
+      const data = await response.json();
+      console.log('📊 GPS data array length:', data.gpsData?.length || 0);
+      if (data.gpsData && data.gpsData.length > 0) {
+        // Only log the latest 4 valid GPS points to reduce console clutter
+        const latestPoints = data.gpsData.slice(-4);
+        console.log('✅ Latest 4 GPS points:', latestPoints);
+      }
 
-      if (response.ok && data.success) {
-        setMapData(data.data || []);
-        console.log('✅ Map data loaded successfully:', data.data?.length || 0, 'locations');
+      if (data.gpsData && Array.isArray(data.gpsData) && data.gpsData.length > 0) {
+        // Transform API data (lat/lon) to our format (latitude/longitude)
+        const transformedData = data.gpsData.map((point: any) => ({
+          latitude: point.lat,
+          longitude: point.lon,
+          timestamp: new Date(point.time * 1000).toISOString(), // Convert Unix timestamp to ISO string
+          speed: point.speed,
+          heading: point.heading,
+          accuracy: point.accuracy,
+        }));
+        
+        setGpsHistory(transformedData);
+        setLastGpsUpdate(new Date());
+        
+        // First filter for valid GPS points
+        const validGpsPoints = transformedData.filter((point: GpsDataPoint) => 
+          point.latitude && 
+          point.longitude && 
+          !isNaN(point.latitude) && 
+          !isNaN(point.longitude) &&
+          point.latitude !== 0 &&
+          point.longitude !== 0 &&
+          Math.abs(point.latitude) <= 90 &&
+          Math.abs(point.longitude) <= 180
+        );
+        
+        // Sort by timestamp (newest first), then take the 4 most recent
+        const sortedByTime = validGpsPoints.sort((a: GpsDataPoint, b: GpsDataPoint) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        
+        // Take the 4 newest points and reverse to show oldest->newest on map
+        const latest4Points = sortedByTime.slice(0, 4).reverse();
+        
+        console.log(`🗺️ Valid GPS points: ${validGpsPoints.length}, showing latest 4:`, 
+          latest4Points.map((p: GpsDataPoint) => ({lat: p.latitude, lon: p.longitude, time: p.timestamp}))
+        );
+        
+        // Convert GPS data to map markers
+        const markers: MapLocation[] = latest4Points
+          .map((point: GpsDataPoint, index: number) => ({
+            id: `gps-${index}`,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            title: index === latest4Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
+            description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` • ${point.speed.toFixed(1)} mph` : ''}`,
+            type: index === latest4Points.length - 1 ? 'vehicle' : 'checkpoint',
+            timestamp: point.timestamp,
+          }));
+        
+        if (markers.length > 0) {
+          setMapData(markers);
+          
+          // Only center map on latest GPS point during initial load, not during auto-refresh
+          if (!isBackgroundRefresh) {
+            const latestPoint = latest4Points[latest4Points.length - 1];
+            if (latestPoint.latitude && latestPoint.longitude && 
+                !isNaN(latestPoint.latitude) && !isNaN(latestPoint.longitude) &&
+                latestPoint.latitude !== 0 && latestPoint.longitude !== 0) {
+              setMapRegion({
+                latitude: latestPoint.latitude,
+                longitude: latestPoint.longitude,
+                latitudeDelta: 0.01, // Zoom in closer for 4 points
+                longitudeDelta: 0.01,
+              });
+            }
+          }
+          
+          const latestPoint = latest4Points[latest4Points.length - 1];
+          console.log('✅ GPS markers created:', markers.length, 'points (latest 4)');
+          console.log('📍 Latest location:', latestPoint.latitude, latestPoint.longitude);
+        } else {
+          console.log('⚠️ No valid GPS coordinates found in data');
+        }
       } else {
-        console.log('ℹ️ Backend map data not available:', data.error);
+        console.log('ℹ️ No GPS data available for this time range');
       }
     } catch (error) {
-      console.log('ℹ️ Backend map service unavailable (expected during development):', error instanceof Error ? error.message : String(error));
+      console.error('❌ Error fetching GPS data:', error instanceof Error ? error.message : String(error));
+      Alert.alert('GPS Error', 'Failed to load vehicle location data');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Initialize location and load data on component mount
-  useEffect(() => {
-    console.log('🚀 LandingScreen initialized, requesting location...');
-    const initializeLocation = async () => {
-      // First request location permission and get current location
-      await requestLocationPermission();
+  // Initialize location and load GPS data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Don't run if user is not authenticated
+      if (!user?.userId || !authToken) {
+        console.log('⏸️ Waiting for user authentication...');
+        return;
+      }
+
+      console.log('🚀 LandingScreen focused, requesting location...');
+      const initializeLocation = async () => {
+        // First request location permission and get current location
+        await requestLocationPermission();
+        
+        // Load GPS data from backend (with loading indicator)
+        await fetchGpsData(false);
+      };
       
-      // Note: Backend data loading disabled during development
-      // Uncomment when backend /api/map/locations endpoint is ready:
-      // loadMapData();
-    };
-    
-    initializeLocation();
-    
-    // Note: Auto-refresh disabled during development to avoid console spam 
-    // Uncomment when backend is ready:
-    // const interval = setInterval(loadMapData, 30000);
-    // return () => clearInterval(interval);
-  }, [authToken]);
+      initializeLocation();
+      
+      // Set up auto-refresh every 60 seconds for real-time GPS updates (only when screen is focused)
+      const interval = setInterval(() => {
+        console.log('🔄 Auto-refreshing GPS data...');
+        fetchGpsData(true); // Pass true for background refresh (no loading indicator)
+      }, 60000); // 60 seconds
+      
+      // Cleanup: stop auto-refresh when screen loses focus
+      return () => {
+        console.log('⏸️ LandingScreen unfocused, stopping GPS auto-refresh');
+        clearInterval(interval);
+      };
+    }, [authToken, user?.userId])
+  );
+
+  // Debug: Monitor mapData changes
+  useEffect(() => {
+    console.log('🗺️ mapData state updated:', mapData.length, 'markers');
+    if (mapData.length > 0) {
+      console.log('📍 First marker:', mapData[0]);
+    }
+  }, [mapData]);
 
   // Zoom functions
   const zoomIn = () => {
@@ -300,7 +427,7 @@ export default function LandingScreen() {
           style={styles.map}
           region={mapRegion}
           onRegionChangeComplete={setMapRegion}
-          showsUserLocation={true}
+          showsUserLocation={false} // Disable default blue dot, we'll use our own marker
           showsMyLocationButton={true}
           showsCompass={true}
           showsScale={true}
@@ -310,23 +437,36 @@ export default function LandingScreen() {
           pitchEnabled={true}
           rotateEnabled={true}
         >
-          {/* Render sample location markers around your current position */}
-          {mapData.map((location) => (
-            <Marker
-              key={location.id}
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              title={location.title}
-              description={`${location.description} • ${new Date(location.timestamp).toLocaleTimeString()}`}
-              pinColor={
-                location.type === 'vehicle' ? '#007AFF' :
-                location.type === 'alert' ? '#FF3B30' :
-                location.type === 'checkpoint' ? '#34C759' : '#FF9500'
-              }
+          {/* Dotted line connecting GPS points */}
+          {mapData.length > 1 && (
+            <Polyline
+              coordinates={mapData.map(point => ({
+                latitude: point.latitude,
+                longitude: point.longitude,
+              }))}
+              strokeColor="#00ACB4"
+              strokeWidth={3}
+              lineDashPattern={[10, 10]} // Creates dotted line effect
             />
-          ))}
+          )}
+          
+          {/* Only render the latest GPS location as a blue pulsing marker */}
+          {mapData.length > 0 && (
+            <Marker
+              key={mapData[mapData.length - 1].id}
+              coordinate={{
+                latitude: mapData[mapData.length - 1].latitude,
+                longitude: mapData[mapData.length - 1].longitude,
+              }}
+              title="Current Location"
+              description={`${mapData[mapData.length - 1].description}`}
+            >
+              <View style={styles.liveMarkerContainer}>
+                <View style={styles.liveMarkerPulse} />
+                <View style={styles.liveMarkerDot} />
+              </View>
+            </Marker>
+          )}
         </MapView>
         
         {/* Loading overlay for real-time data updates */}
@@ -358,8 +498,19 @@ export default function LandingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Zoom controls - bottom right */}
+        {/* Zoom and Live Stream controls - bottom right */}
         <View style={styles.zoomControlsOverlay}>
+          {/* Live Stream button */}
+          <TouchableOpacity 
+            style={[styles.zoomButton, { 
+              backgroundColor: '#00ACB4', // Teal for live stream
+              marginBottom: 8
+            }]}
+            onPress={() => navigation.navigate('LiveStream')}
+          >
+            <Video size={20} color="#FFFFFF" strokeWidth={2} />
+          </TouchableOpacity>
+
           {/* Zoom in button */}
           <TouchableOpacity 
             style={[styles.zoomButton, { backgroundColor: theme.colors.surface }]}
@@ -543,6 +694,31 @@ const styles = StyleSheet.create({
   zoomButtonText: {
     fontSize: 24,
     fontWeight: '600',
+  },
+  liveMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveMarkerPulse: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 122, 255, 0.3)',
+    opacity: 0.8,
+  },
+  liveMarkerDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
 });
 

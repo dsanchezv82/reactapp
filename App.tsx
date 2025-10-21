@@ -1,7 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { Calendar, Camera, Home, Mail, User } from 'lucide-react-native';
-import { Platform, StyleSheet } from 'react-native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Calendar, Camera, ChevronLeft, Home, Mail, User } from 'lucide-react-native';
+import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import contexts
@@ -15,11 +16,13 @@ import ThemedView from './components/ThemedView';
 // Import screens
 import EventsScreen from './screens/EventsScreen';
 import LandingScreen from './screens/LandingScreen';
+import LiveScreen from './screens/LiveScreen';
 import LoginScreen from './screens/LoginScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import VideoScreen from './screens/VideoScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 // Loading screen component
 function LoadingScreen() {
@@ -115,6 +118,7 @@ function MainTabNavigator() {
 // App navigator with authentication logic
 function AppNavigator() {
   const { isAuthenticated, loading } = useAuth();
+  const { theme } = useTheme();
 
   if (loading) {
     return <LoadingScreen />;
@@ -122,7 +126,34 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainTabNavigator /> : <LoginScreen />}
+      {isAuthenticated ? (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Home" component={MainTabNavigator} />
+          <Stack.Screen 
+            name="LiveStream" 
+            component={LiveScreen}
+            options={({ navigation }) => ({
+              headerShown: true,
+              title: 'Live Stream',
+              presentation: 'card',
+              headerStyle: {
+                backgroundColor: theme.colors.surface,
+              },
+              headerTintColor: theme.colors.text,
+              headerLeft: () => (
+                <TouchableOpacity 
+                  onPress={() => navigation.navigate('Home')}
+                  style={{ marginLeft: 15, padding: 5 }}
+                >
+                  <ChevronLeft size={28} color={theme.colors.text} strokeWidth={2} />
+                </TouchableOpacity>
+              ),
+            })}
+          />
+        </Stack.Navigator>
+      ) : (
+        <LoginScreen />
+      )}
     </NavigationContainer>
   );
 }
