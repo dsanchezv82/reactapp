@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { Video } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,7 @@ interface MapLocation {
   description: string;
   type: 'vehicle' | 'alert' | 'checkpoint';
   timestamp: string;
+  speed?: number;
 }
 
 interface ApiResponse<T> {
@@ -254,11 +255,6 @@ export default function LandingScreen({ navigation }: any) {
 
       const data = await response.json();
       console.log('📊 GPS data array length:', data.gpsData?.length || 0);
-      if (data.gpsData && data.gpsData.length > 0) {
-        // Only log the latest 4 valid GPS points to reduce console clutter
-        const latestPoints = data.gpsData.slice(-4);
-        console.log('✅ Latest 4 GPS points:', latestPoints);
-      }
 
       if (data.gpsData && Array.isArray(data.gpsData) && data.gpsData.length > 0) {
         // Transform API data (lat/lon) to our format (latitude/longitude)
@@ -270,6 +266,18 @@ export default function LandingScreen({ navigation }: any) {
           heading: point.heading,
           accuracy: point.accuracy,
         }));
+        
+        // Sort by timestamp and get the 4 most recent points for logging
+        const sortedForLogging = [...transformedData].sort((a: GpsDataPoint, b: GpsDataPoint) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        const latest4 = sortedForLogging.slice(0, 4);
+        console.log('✅ Latest 4 GPS points (by timestamp):', latest4.map((p: GpsDataPoint) => ({
+          lat: p.latitude,
+          lon: p.longitude,
+          speed: p.speed,
+          time: p.timestamp
+        })));
         
         setGpsHistory(transformedData);
         setLastGpsUpdate(new Date());
@@ -286,28 +294,31 @@ export default function LandingScreen({ navigation }: any) {
           Math.abs(point.longitude) <= 180
         );
         
-        // Sort by timestamp (newest first), then take the 4 most recent
+        // Sort by timestamp (newest first), then take the 20 most recent for display
         const sortedByTime = validGpsPoints.sort((a: GpsDataPoint, b: GpsDataPoint) => 
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
         
-        // Take the 4 newest points and reverse to show oldest->newest on map
-        const latest4Points = sortedByTime.slice(0, 4).reverse();
+        // Take the 20 newest points and reverse to show oldest->newest on map
+        const latest20Points = sortedByTime.slice(0, 20).reverse();
         
-        console.log(`🗺️ Valid GPS points: ${validGpsPoints.length}, showing latest 4:`, 
-          latest4Points.map((p: GpsDataPoint) => ({lat: p.latitude, lon: p.longitude, time: p.timestamp}))
+        // Log only the 4 most recent (for debugging)
+        const latest4ForLogging = sortedByTime.slice(0, 4);
+        console.log(`🗺️ Valid GPS points: ${validGpsPoints.length}, displaying 20, logging latest 4:`, 
+          latest4ForLogging.map((p: GpsDataPoint) => ({lat: p.latitude, lon: p.longitude, time: p.timestamp}))
         );
         
         // Convert GPS data to map markers
-        const markers: MapLocation[] = latest4Points
+        const markers: MapLocation[] = latest20Points
           .map((point: GpsDataPoint, index: number) => ({
             id: `gps-${index}`,
             latitude: point.latitude,
             longitude: point.longitude,
-            title: index === latest4Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
+            title: index === latest20Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
             description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` • ${point.speed.toFixed(1)} mph` : ''}`,
-            type: index === latest4Points.length - 1 ? 'vehicle' : 'checkpoint',
+            type: index === latest20Points.length - 1 ? 'vehicle' : 'checkpoint',
             timestamp: point.timestamp,
+            speed: point.speed,
           }));
         
         if (markers.length > 0) {
@@ -315,21 +326,21 @@ export default function LandingScreen({ navigation }: any) {
           
           // Only center map on latest GPS point during initial load, not during auto-refresh
           if (!isBackgroundRefresh) {
-            const latestPoint = latest4Points[latest4Points.length - 1];
+            const latestPoint = latest20Points[latest20Points.length - 1];
             if (latestPoint.latitude && latestPoint.longitude && 
                 !isNaN(latestPoint.latitude) && !isNaN(latestPoint.longitude) &&
                 latestPoint.latitude !== 0 && latestPoint.longitude !== 0) {
               setMapRegion({
                 latitude: latestPoint.latitude,
                 longitude: latestPoint.longitude,
-                latitudeDelta: 0.01, // Zoom in closer for 4 points
+                latitudeDelta: 0.01, // Zoom in closer
                 longitudeDelta: 0.01,
               });
             }
           }
           
-          const latestPoint = latest4Points[latest4Points.length - 1];
-          console.log('✅ GPS markers created:', markers.length, 'points (latest 4)');
+          const latestPoint = latest20Points[latest20Points.length - 1];
+          console.log('✅ GPS markers created:', markers.length, 'points (displaying 20)');
           console.log('📍 Latest location:', latestPoint.latitude, latestPoint.longitude);
         } else {
           console.log('⚠️ No valid GPS coordinates found in data');
@@ -356,6 +367,11 @@ export default function LandingScreen({ navigation }: any) {
       }
 
       console.log('🚀 LandingScreen focused, requesting location...');
+      
+      // Set loading state and clear map data to prevent showing stale trail
+      setLoading(true);
+      setMapData([]);
+      
       const initializeLocation = async () => {
         // First request location permission and get current location
         await requestLocationPermission();
@@ -366,11 +382,11 @@ export default function LandingScreen({ navigation }: any) {
       
       initializeLocation();
       
-      // Set up auto-refresh every 60 seconds for real-time GPS updates (only when screen is focused)
+      // Set up auto-refresh every 30 seconds for real-time GPS updates (only when screen is focused)
       const interval = setInterval(() => {
         console.log('🔄 Auto-refreshing GPS data...');
         fetchGpsData(true); // Pass true for background refresh (no loading indicator)
-      }, 60000); // 60 seconds
+      }, 30000); // 30 seconds
       
       // Cleanup: stop auto-refresh when screen loses focus
       return () => {
@@ -407,20 +423,7 @@ export default function LandingScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header with logo */}
-      <View style={[styles.banner, { 
-        backgroundColor: theme.colors.surface,
-        borderBottomColor: theme.colors.border,
-        paddingTop: insets.top + 16 
-      }]}>
-        <Image 
-          source={require('../assets/images/brand-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-      
-      {/* Real-Time Map - Full screen between header and navigation */}
+      {/* Real-Time Map - Full screen */}
       <View style={styles.mapContainer}>
         {/* Real-Time Interactive Map with Current Location */}
         <MapView
@@ -437,21 +440,82 @@ export default function LandingScreen({ navigation }: any) {
           pitchEnabled={true}
           rotateEnabled={true}
         >
-          {/* Dotted line connecting GPS points */}
-          {mapData.length > 1 && (
-            <Polyline
-              coordinates={mapData.map(point => ({
-                latitude: point.latitude,
-                longitude: point.longitude,
-              }))}
-              strokeColor="#00ACB4"
-              strokeWidth={3}
-              lineDashPattern={[10, 10]} // Creates dotted line effect
-            />
-          )}
+          {/* Dotted line connecting GPS points - only show if car is moving, color by speed */}
+          {!loading && mapData.length > 1 && (() => {
+            // Check if car is currently stationary
+            const latestPoint = mapData[mapData.length - 1];
+            
+            // Check if latest point has very low speed (< 3 mph - essentially stopped/idling)
+            const hasZeroSpeed = !latestPoint.speed || latestPoint.speed < 3;
+            
+            // Check if latest point is 5 minutes or older (stale data)
+            const latestTimestamp = new Date(latestPoint.timestamp).getTime();
+            const currentTime = new Date().getTime();
+            const timeDifferenceMinutes = (currentTime - latestTimestamp) / (1000 * 60);
+            const isDataStale = timeDifferenceMinutes >= 5;
+            
+            // Check if the last two points are identical (device on standby - no new data)
+            let isDeviceOnStandby = false;
+            if (mapData.length >= 2) {
+              const previousPoint = mapData[mapData.length - 2];
+              isDeviceOnStandby = 
+                latestPoint.latitude === previousPoint.latitude &&
+                latestPoint.longitude === previousPoint.longitude &&
+                latestPoint.speed === previousPoint.speed &&
+                latestPoint.timestamp === previousPoint.timestamp;
+            }
+            
+            // Car is stationary if:
+            // 1. Speed is 0 AND data is 5+ minutes old, OR
+            // 2. GPS data hasn't changed in 5+ minutes (device on standby)
+            const isStationary = (hasZeroSpeed && isDataStale) || (isDeviceOnStandby && isDataStale);
+            
+            // Don't show trail if car is currently stationary
+            if (isStationary) {
+              const reason = isDeviceOnStandby ? 'device on standby' : 'speed: 0';
+              console.log('🅿️ Vehicle stationary - hiding trail (', reason, 'for', timeDifferenceMinutes.toFixed(1), 'minutes)');
+              return null;
+            }
+            
+            // Function to get color based on speed (in mph)
+            const getSpeedColor = (speed?: number): string => {
+              if (!speed || speed < 0) return '#87CEEB'; // Light blue for 0-20 mph (default)
+              if (speed < 20) return '#87CEEB';  // Light blue: 0-20 mph
+              if (speed < 40) return '#00C853';  // Green: 20-40 mph
+              if (speed < 60) return '#64DD17';  // Light green: 40-60 mph
+              if (speed < 70) return '#FFD600';  // Yellow: 60-70 mph
+              if (speed < 75) return '#FF6B6B';  // Light red: 70-75 mph
+              return '#FF0000';                   // Red: 75+ mph
+            };
+            
+            // Create segments between each pair of points with colors based on speed
+            const segments = [];
+            for (let i = 0; i < mapData.length - 1; i++) {
+              const currentPoint = mapData[i];
+              const nextPoint = mapData[i + 1];
+              
+              // Use the speed from the starting point of the segment
+              const color = getSpeedColor(currentPoint.speed);
+              
+              segments.push(
+                <Polyline
+                  key={`segment-${i}`}
+                  coordinates={[
+                    { latitude: currentPoint.latitude, longitude: currentPoint.longitude },
+                    { latitude: nextPoint.latitude, longitude: nextPoint.longitude },
+                  ]}
+                  strokeColor={color}
+                  strokeWidth={4}
+                  lineDashPattern={[1, 10]}
+                />
+              );
+            }
+            
+            return <>{segments}</>;
+          })()}
           
           {/* Only render the latest GPS location as a blue pulsing marker */}
-          {mapData.length > 0 && (
+          {!loading && mapData.length > 0 && (
             <Marker
               key={mapData[mapData.length - 1].id}
               coordinate={{
@@ -483,13 +547,13 @@ export default function LandingScreen({ navigation }: any) {
         
         {/* Control buttons overlay - top right */}
         <View style={styles.controlsOverlay}>
-          {/* Location refresh button */}
+          {/* GPS data refresh button */}
           <TouchableOpacity 
             style={[styles.refreshButton, { 
-              backgroundColor: '#34C759', // Green for location
+              backgroundColor: '#34C759', // Green for GPS refresh
               opacity: loading ? 0.7 : 1
             }]}
-            onPress={requestLocationPermission}
+            onPress={() => fetchGpsData(false)}
             disabled={loading}
           >
             <Text style={styles.refreshButtonText}>
@@ -531,6 +595,37 @@ export default function LandingScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Speed Legend - bottom left */}
+        {mapData.length > 1 && (
+          <View style={[styles.speedLegend, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.speedLegendTitle, { color: theme.colors.text }]}>Speed</Text>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#87CEEB' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>0-20 mph</Text>
+            </View>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#00C853' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>20-40 mph</Text>
+            </View>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#64DD17' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>40-60 mph</Text>
+            </View>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#FFD600' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>60-70 mph</Text>
+            </View>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#FF6B6B' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>70-75 mph</Text>
+            </View>
+            <View style={styles.speedLegendItem}>
+              <View style={[styles.speedLegendColor, { backgroundColor: '#FF0000' }]} />
+              <Text style={[styles.speedLegendText, { color: theme.colors.text }]}>75+ mph</Text>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -540,19 +635,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  banner: {
-    width: '100%',
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  logo: {
-    width: 200,
-    height: 60,
-  },
   mapContainer: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
   mapPlaceholder: {
     flex: 1,
@@ -609,7 +693,7 @@ const styles = StyleSheet.create({
   },
   controlsOverlay: {
     position: 'absolute',
-    top: 20,
+    top: 60,
     right: 20,
     alignItems: 'flex-end',
   },
@@ -719,6 +803,40 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
+  },
+  speedLegend: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    padding: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  speedLegendTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  speedLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  speedLegendColor: {
+    width: 20,
+    height: 3,
+    marginRight: 8,
+    borderRadius: 2,
+  },
+  speedLegendText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });
 

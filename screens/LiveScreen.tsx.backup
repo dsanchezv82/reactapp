@@ -18,6 +18,7 @@ const { width, height } = Dimensions.get('window');
 interface LiveStreamResponse {
   address: string;
   mediaToken: string;
+  surfsightJwt?: string; // Optional for now, required for live streaming
 }
 
 export default function LiveScreen({ navigation }: any) {
@@ -106,19 +107,22 @@ export default function LiveScreen({ navigation }: any) {
       }
 
       const data: LiveStreamResponse = JSON.parse(responseText);
-      console.log('✅ Live stream data received');
+      console.log('✅ Live stream data received:',  JSON.stringify(data, null, 2));
       console.log('🎬 Stream address:', data.address);
       console.log('🔑 Media token length:', data.mediaToken?.length);
+      console.log('🔑 Surfsight JWT available:', !!data.surfsightJwt);
       
       // Store the values for display
       setStreamUrl(data.address);
       setMediaToken(data.mediaToken);
       
-      // Build HLS stream player per Surfsight API spec
-      const streamHtml = buildHlsPlayer(data);
+      // Build live stream player
+      // If we have the Surfsight JWT, use the official Lytx web component
+      // Otherwise, attempt HLS streaming or show instructions
+      const streamHtml = data.surfsightJwt ? buildLytxPlayer(data) : buildHlsPlayer(data);
       
       setHtmlContent(streamHtml);
-      console.log('📺 HLS stream player initialized');
+      console.log('📺 Stream player initialized');
       
       setLoading(false);
       setRetryCount(0);
@@ -149,17 +153,13 @@ export default function LiveScreen({ navigation }: any) {
     }
   };
 
-  // Build HLS stream player per Surfsight API spec
-  const buildHlsPlayer = (data: LiveStreamResponse) => {
-    // Per Surfsight API: stream at https://{address}/hls/{imei}/stream.m3u8?token={mediaToken}
-    const hlsUrl = `https://${data.address}/hls/${user?.imei}/stream.m3u8?token=${data.mediaToken}`;
-    
+  // Build Lytx official web component player (requires Surfsight JWT)
+  const buildLytxPlayer = (data: LiveStreamResponse) => {
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <style>
     * {
       margin: 0;
@@ -172,147 +172,224 @@ export default function LiveScreen({ navigation }: any) {
       overflow: hidden;
       background: #000;
     }
-    #video-container {
+    #player-container {
       width: 100%;
       height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: relative;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
     video {
       width: 100%;
       height: 100%;
       object-fit: contain;
+      background: #000;
     }
-    .loading {
+    .loading-overlay {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
       color: white;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      text-align: center;
+      z-index: 10;
     }
-    .error {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #ff6b6b;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      text-align: center;
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .status {
+      font-size: 16px;
+      color: #00ACB4;
+      margin-top: 10px;
+    }
+    .info {
+      margin-top: 30px;
       padding: 20px;
-      max-width: 80%;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      max-width: 350px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
-  <div id="video-container">
-    <div class="loading" id="loading">
-      <div style="font-size: 48px; margin-bottom: 16px;">📹</div>
-      <div>Connecting to camera...</div>
-      <div style="font-size: 12px; margin-top: 8px; color: #999;">
-        ${user?.imei}
+  <div id="player-container">
+    <div class="loading-overlay" id="loading">
+      <div class="icon">📹</div>
+      <h2>Attempting Live Stream Connection</h2>
+      <div class="status">Connecting to media server...</div>
+      <div class="info">
+        <strong>Stream Details:</strong><br/>
+        Device: ${user?.imei}<br/>
+        Server: ${data.address}<br/>
+        Status: Authenticating
       </div>
     </div>
-    <video id="video" controls autoplay playsinline muted style="display:none;"></video>
-    <div class="error" id="error" style="display:none;"></div>
+    
+    <video id="video" autoplay playsinline muted controls style="display:none;">
+      Your browser doesn't support video playback.
+    </video>
   </div>
   
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
+    // Surfsight/Lytx streaming configuration
+    const config = {
+      server: '${data.address}',
+      mediaToken: '${data.mediaToken}',
+      imei: '${user?.imei}',
+      familyId: '${user?.familyId || ''}'
+    };
+    
+    console.log('🎬 Initializing Surfsight HLS stream:', config);
+    
     const video = document.getElementById('video');
     const loading = document.getElementById('loading');
-    const errorDiv = document.getElementById('error');
-    const hlsUrl = '${hlsUrl}';
     
-    console.log('🎬 Initializing HLS stream');
-    console.log('📺 Stream URL:', hlsUrl);
-    console.log('📍 IMEI:', '${user?.imei}');
-    console.log('🌐 Media server:', '${data.address}');
+    // Try HLS streaming with media token
+    // Surfsight uses HLS for their web player
+    const hlsUrl = \`https://\${config.server}/hls/\${config.imei}/stream.m3u8?token=\${config.mediaToken}\`;
     
-    function showError(message) {
-      loading.style.display = 'none';
-      video.style.display = 'none';
-      errorDiv.style.display = 'block';
-      errorDiv.innerHTML = '<div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>' +
-                          '<div style="font-weight: bold; margin-bottom: 8px;">Stream Unavailable</div>' +
-                          '<div style="font-size: 14px;">' + message + '</div>';
-      console.error('❌ Stream error:', message);
-    }
+    console.log('📺 HLS URL:', hlsUrl);
     
     if (Hls.isSupported()) {
       const hls = new Hls({
-        debug: false,
+        debug: true,
         enableWorker: true,
         lowLatencyMode: true,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
+        xhrSetup: function(xhr, url) {
+          // Add authentication header if needed
+          xhr.setRequestHeader('Authorization', 'Bearer ' + config.mediaToken);
+        }
       });
       
       hls.loadSource(hlsUrl);
       hls.attachMedia(video);
       
       hls.on(Hls.Events.MANIFEST_PARSED, function() {
-        console.log('✅ HLS manifest loaded successfully');
+        console.log('✅ HLS manifest parsed successfully');
         loading.style.display = 'none';
         video.style.display = 'block';
-        
         video.play().catch(e => {
-          console.log('⚠️ Autoplay blocked, waiting for user interaction');
-          showError('Tap the play button to start the stream');
+          console.error('❌ Video play error:', e);
+          showError('Failed to start video playback. Tap to play manually.');
         });
       });
       
       hls.on(Hls.Events.ERROR, function(event, data) {
-        console.error('❌ HLS error:', data.type, data.details);
-        
+        console.error('❌ HLS error:', data);
         if (data.fatal) {
           switch(data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('Fatal network error - Camera may be offline');
-              showError('Camera is offline or unreachable. Please check if the device is powered on and connected.');
+              console.error('Network error - trying to recover');
+              showError('Network error loading stream. This may require Surfsight JWT token.');
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error('Fatal media error - Trying to recover');
+              console.error('Media error - trying to recover');
               hls.recoverMediaError();
               break;
             default:
-              console.error('Fatal error - Cannot recover');
-              showError('Unable to load video stream. Please try again later.');
-              hls.destroy();
+              console.error('Fatal error - cannot recover');
+              showError('Stream connection failed. Surfsight requires JWT authentication token.');
               break;
           }
         }
       });
-      
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (iOS Safari)
-      console.log('📱 Using native HLS support');
       video.src = hlsUrl;
-      
       video.addEventListener('loadedmetadata', function() {
-        console.log('✅ Native HLS stream loaded');
+        console.log('✅ Native HLS loaded');
         loading.style.display = 'none';
         video.style.display = 'block';
-        
         video.play().catch(e => {
-          console.log('⚠️ Autoplay blocked');
-          showError('Tap to play');
+          console.error('❌ Video play error:', e);
+          showError('Failed to start video playback');
         });
       });
       
       video.addEventListener('error', function(e) {
         console.error('❌ Video error:', e);
-        showError('Camera is offline or the stream is unavailable.');
+        showError('Stream connection failed. Missing Surfsight JWT token.');
       });
-      
     } else {
-      showError('HLS video streaming is not supported in this browser');
+      showError('HLS not supported in this browser');
+    }
+    
+    function showError(message) {
+      loading.innerHTML = \`
+        <div class="icon">⚠️</div>
+        <h2>Stream Unavailable</h2>
+        <div class="status" style="color: #FF6B6B;">\${message}</div>
+        <div class="info">
+          <strong>Issue:</strong><br/>
+          The media server and token are valid, but Surfsight's live streaming 
+          requires the Surfsight JWT authentication token.<br/><br/>
+          <strong>Solution:</strong><br/>
+          The backend API needs to return the Surfsight JWT along with the 
+          media server address and token.<br/><br/>
+          <strong>Current Data:</strong><br/>
+          • Device: \${config.imei}<br/>
+          • Server: \${config.server}<br/>
+          • Family ID: \${config.familyId}<br/>
+          • Token: Available ✓
+        </div>
+      \`;
     }
   </script>
 </body>
 </html>
-    `;
+      `;
+      
+      setHtmlContent(streamHtml);
+      console.log('📺 Stream connection established - displaying info');
+      
+      setLoading(false);
+      setRetryCount(0);
+
+      console.log('✅ Stream URL set successfully, WebView should load now');
+
+      // Set up refresh timer for 2 minutes - clear any existing timer first
+      if (refreshTimerRef.current) {
+        console.log('🧹 Clearing existing refresh timer');
+        clearTimeout(refreshTimerRef.current);
+      }
+      
+      console.log('⏰ Setting up stream refresh timer for 2 minutes...');
+      refreshTimerRef.current = setTimeout(() => {
+        console.log('⏰ Auto-refreshing stream token after 2 minutes...');
+        fetchLiveStreamUrl();
+      }, 2 * 60 * 1000);
+
+    } catch (err: any) {
+      console.error('❌ Live stream error:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack
+      });
+      setError(err.message || 'Camera Offline');
+      setLoading(false);
+    } finally {
+      isFetchingRef.current = false;
+    }
   };
 
   const handleRetry = () => {

@@ -67,9 +67,21 @@ export default function EventsScreen() {
     try {
       console.log('🔄 Loading device events for IMEI:', user.imei);
       console.log('🔑 Auth token:', authToken ? 'Present' : 'Missing');
-      console.log('📍 API URL:', `${API_BASE_URL}/events/${user.imei}`);
       
-      const response = await fetch(`${API_BASE_URL}/events/${user.imei}`, {
+      // Get events from last 7 days
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const queryParams = new URLSearchParams({
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        limit: '50',
+      });
+      
+      const url = `${API_BASE_URL}/events/${user.imei}?${queryParams.toString()}`;
+      console.log('� API URL:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -78,22 +90,20 @@ export default function EventsScreen() {
       });
 
       console.log('📡 Events response status:', response.status);
-      console.log('📡 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
 
       const responseText = await response.text();
-      console.log('📦 Raw response:', responseText.substring(0, 500)); // First 500 chars
+      console.log('📦 Raw response (first 500 chars):', responseText.substring(0, 500));
 
       if (response.ok) {
-        const data = JSON.parse(responseText);
-        console.log('📦 Full response data:', JSON.stringify(data, null, 2));
-        console.log('📦 Data type:', typeof data);
-        console.log('📦 Is array?', Array.isArray(data));
-        console.log('📦 Data keys:', Object.keys(data || {}));
+        const responseData = JSON.parse(responseText);
+        console.log('📦 Response keys:', Object.keys(responseData || {}));
         
-        const eventsList = data.events || data.data || (Array.isArray(data) ? data : []);
+        const eventsList = responseData.data || [];
         setEvents(eventsList);
         console.log('✅ Events loaded successfully:', eventsList.length);
-        console.log('✅ First event:', eventsList[0] ? JSON.stringify(eventsList[0], null, 2) : 'No events');
+        if (eventsList.length > 0) {
+          console.log('✅ First event:', JSON.stringify(eventsList[0], null, 2));
+        }
       } else {
         const errorData = JSON.parse(responseText || '{}');
         console.log('❌ Failed to load events:', errorData);

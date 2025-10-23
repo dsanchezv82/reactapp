@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Calendar, Camera, ChevronLeft, Home, Mail, User } from 'lucide-react-native';
+import { Calendar, Camera, ChevronLeft, Home, User } from 'lucide-react-native';
 import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -36,17 +36,8 @@ function LoadingScreen() {
   );
 }
 
-// Messages screen placeholder
-function MessagesScreen() {
-  return (
-    <ThemedView style={styles.centerContainer}>
-      <ThemedText type="title">Messages</ThemedText>
-      <ThemedText type="secondary">Coming soon...</ThemedText>
-    </ThemedView>
-  );
-}
 
-// Theme-aware Tab Navigator
+// Main Tab Navigator
 function MainTabNavigator() {
   const { theme } = useTheme();
 
@@ -90,15 +81,6 @@ function MainTabNavigator() {
         options={{
           tabBarIcon: ({ focused, color }) => (
             <Calendar size={focused ? 26 : 24} color={color} strokeWidth={2} />
-          ),
-        }}
-      />
-      <Tab.Screen 
-        name="Messages" 
-        component={MessagesScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Mail size={focused ? 26 : 24} color={color} strokeWidth={2} />
           ),
         }}
       />
