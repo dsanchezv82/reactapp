@@ -1,19 +1,20 @@
 import { AlertTriangle, Calendar, Clock, MapPin, Video } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Platform,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Platform,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import themed components
+import EventDetailModal from '../components/EventDetailModal';
 import ThemedText from '../components/ThemedText';
 import ThemedView from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,28 +25,40 @@ const API_BASE_URL = 'https://api.garditech.com/api';
 
 // Event interface matching Surfsight API response
 interface DeviceEvent {
-  id: string;
+  id: string | number;
   eventType: string;
-  timestamp: string;
+  time: string; // Surfsight uses 'time' not 'timestamp'
+  lat: number;
+  lon: number;
   location?: {
     latitude: number;
     longitude: number;
     address?: string;
   };
-  severity?: 'low' | 'medium' | 'high' | 'critical';
+  severity?: number; // Surfsight uses numeric severity (1-5)
+  status?: 'new' | 'resolved';
   description?: string;
   videoUrl?: string;
   thumbnailUrl?: string;
   duration?: number;
   speed?: number;
-  metadata?: Record<string, any>;
+  metadata?: string | Record<string, any>;
+  files?: any[];
+  driver?: boolean;
+  eventComments?: any[];
 }
 
 export default function EventsScreen() {
   const [events, setEvents] = useState<DeviceEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'critical' | 'today'>('all');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'today'>('all');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const { theme } = useTheme();
   const { user, authToken } = useAuth();
@@ -53,33 +66,53 @@ export default function EventsScreen() {
 
   useEffect(() => {
     if (user?.imei) {
-      loadEvents();
+      loadEvents(true); // true = reset/initial load
     }
   }, [user?.imei]);
 
   // Load events from backend with device IMEI
-  const loadEvents = async () => {
+  const loadEvents = async (reset: boolean = false) => {
     if (!user?.imei) {
       setLoading(false);
       return;
     }
+    
+    // If loading more and already at the end, don't fetch
+    if (!reset && !hasMore) {
+      console.log('📭 No more events to load');
+      return;
+    }
 
     try {
+      const currentOffset = reset ? 0 : offset;
+      
+      if (reset) {
+        setLoading(true);
+        setOffset(0);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
       console.log('🔄 Loading device events for IMEI:', user.imei);
+      console.log('📊 Offset:', currentOffset, '| Reset:', reset);
       console.log('🔑 Auth token:', authToken ? 'Present' : 'Missing');
       
       // Get events from last 7 days
       const endDate = new Date();
       const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       
+      // Note: API spec says GET with body, but React Native fetch doesn't support that
+      // Backend must be accepting query params as well, since it was working
       const queryParams = new URLSearchParams({
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         limit: '50',
+        offset: String(currentOffset),
       });
       
       const url = `${API_BASE_URL}/events/${user.imei}?${queryParams.toString()}`;
-      console.log('� API URL:', url);
+      console.log('📍 API URL:', url);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -94,84 +127,117 @@ export default function EventsScreen() {
       const responseText = await response.text();
       console.log('📦 Raw response (first 500 chars):', responseText.substring(0, 500));
 
+      if (!response.ok) {
+        console.error('❌ HTTP Error:', response.status);
+        console.error('❌ Response body:', responseText);
+        const errorData = JSON.parse(responseText || '{}');
+        console.error('❌ Failed to load events:', errorData);
+        Alert.alert('Error', errorData.error || errorData.message || responseText || 'Failed to load events');
+        if (reset) {
+          setEvents([]);
+        }
+        return;
+      }
+
       if (response.ok) {
         const responseData = JSON.parse(responseText);
         console.log('📦 Response keys:', Object.keys(responseData || {}));
         
-        const eventsList = responseData.data || [];
-        setEvents(eventsList);
-        console.log('✅ Events loaded successfully:', eventsList.length);
-        if (eventsList.length > 0) {
-          console.log('✅ First event:', JSON.stringify(eventsList[0], null, 2));
+        const allEvents = responseData.data || [];
+        const eventMetadata = responseData.metadata || {};
+        
+        // TODO: Re-enable driver filter when driver assignments are working
+        // const driverEvents = allEvents.filter((event: DeviceEvent) => event.driver === true);
+        const driverEvents = allEvents; // Show all events for now
+        
+        // Update state based on whether this is a reset or loading more
+        if (reset) {
+          setEvents(driverEvents);
+        } else {
+          setEvents(prevEvents => [...prevEvents, ...driverEvents]);
+        }
+        
+        // Update pagination state - use allEvents.length for offset (before filtering)
+        const newOffset = currentOffset + allEvents.length;
+        setOffset(newOffset);
+        
+        // Check if there are more events to load
+        // If we received fewer than 50 total events, we've reached the end
+        setHasMore(allEvents.length === 50);
+        
+        // Update total count if available in metadata
+        if (eventMetadata.total !== undefined) {
+          setTotalCount(eventMetadata.total);
+        }
+        
+        console.log('✅ Total events received:', allEvents.length);
+        console.log('✅ Events loaded:', driverEvents.length);
+        console.log('📊 Metadata:', eventMetadata);
+        console.log('📊 New offset:', newOffset, '| Has more:', allEvents.length === 50);
+        
+        if (driverEvents.length > 0) {
+          console.log('✅ First event:', JSON.stringify(driverEvents[0], null, 2));
+        } else {
+          console.log('ℹ️ No events found for this time range');
         }
       } else {
         const errorData = JSON.parse(responseText || '{}');
         console.log('❌ Failed to load events:', errorData);
         Alert.alert('Error', errorData.error || errorData.message || 'Failed to load events');
-        setEvents([]);
+        if (reset) {
+          setEvents([]);
+        }
       }
     } catch (error) {
       console.log('❌ Network error loading events:', error);
       Alert.alert('Error', 'Failed to load events. Please try again.');
-      setEvents([]);
+      if (reset) {
+        setEvents([]);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Load more events (pagination)
+  const loadMoreEvents = () => {
+    if (!loadingMore && hasMore) {
+      console.log('📥 Loading more events...');
+      loadEvents(false);
     }
   };
 
   // Pull-to-refresh functionality
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadEvents();
+    await loadEvents(true); // Reset and reload from beginning
     setRefreshing(false);
   };
 
   // Fetch individual event details
-  const fetchEventDetails = async (eventId: string) => {
-    if (!user?.imei) return;
+  const openEventDetail = (eventId: string) => {
+    setSelectedEventId(eventId);
+    setModalVisible(true);
+  };
 
-    try {
-      console.log('🔄 Loading event details:', eventId);
-      
-      const response = await fetch(`${API_BASE_URL}/events/${user.imei}/${eventId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Event details loaded:', data);
-        // Handle event details (could open a modal or navigate to detail screen)
-        Alert.alert('Event Details', JSON.stringify(data, null, 2));
-      } else {
-        Alert.alert('Error', 'Failed to load event details');
-      }
-    } catch (error) {
-      console.log('❌ Error loading event details:', error);
-      Alert.alert('Error', 'Failed to load event details');
+  // Get severity icon and color based on Surfsight numeric severity (1-5)
+  const getSeverityInfo = (severity?: number) => {
+    if (!severity) return { color: theme.colors.textSecondary, icon: '📍' };
+    
+    // Surfsight severity scale: 1=lowest, 5=highest
+    if (severity >= 4) {
+      return { color: '#FF3B30', icon: '🚨' }; // Critical (4-5)
+    } else if (severity === 3) {
+      return { color: '#FF9500', icon: '⚠️' }; // High (3)
+    } else if (severity === 2) {
+      return { color: '#FFCC00', icon: '⚡' }; // Medium (2)
+    } else {
+      return { color: '#34C759', icon: 'ℹ️' }; // Low (1)
     }
   };
 
-  // Get severity icon and color
-  const getSeverityInfo = (severity?: string) => {
-    switch (severity?.toLowerCase()) {
-      case 'critical':
-        return { color: '#FF3B30', icon: '🚨' };
-      case 'high':
-        return { color: '#FF9500', icon: '⚠️' };
-      case 'medium':
-        return { color: '#FFCC00', icon: '⚡' };
-      case 'low':
-        return { color: '#34C759', icon: 'ℹ️' };
-      default:
-        return { color: theme.colors.textSecondary, icon: '📍' };
-    }
-  };
-
-  // Format timestamp
+  // Format timestamp - Surfsight uses 'time' field
   const formatEventTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -195,14 +261,10 @@ export default function EventsScreen() {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     switch (filter) {
-      case 'critical':
-        return events.filter(event => 
-          event.severity?.toLowerCase() === 'critical' || event.severity?.toLowerCase() === 'high'
-        );
       case 'today':
-        return events.filter(event => new Date(event.timestamp) >= todayStart);
+        return events.filter(event => new Date(event.time) >= todayStart);
       default:
-        return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        return events.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     }
   };
 
@@ -216,10 +278,10 @@ export default function EventsScreen() {
           styles.eventItem,
           {
             backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.border,
+            borderColor: '#00ACB4',
           }
         ]}
-        onPress={() => fetchEventDetails(item.id)}
+        onPress={() => openEventDetail(String(item.id))}
         activeOpacity={0.7}
       >
         {item.thumbnailUrl && (
@@ -247,7 +309,7 @@ export default function EventsScreen() {
               <View style={styles.eventMeta}>
                 <Clock size={14} color={theme.colors.textSecondary} strokeWidth={2} />
                 <ThemedText type="secondary" style={styles.eventTime}>
-                  {formatEventTime(item.timestamp)}
+                  {formatEventTime(item.time)}
                 </ThemedText>
               </View>
             </View>
@@ -260,22 +322,31 @@ export default function EventsScreen() {
           )}
 
           <View style={styles.eventDetails}>
-            {item.location?.address && (
+            {/* Show coordinates if available (lat/lon from Surfsight) */}
+            {item.lat !== -1 && item.lon !== -1 && (
               <View style={styles.eventLocation}>
                 <MapPin size={14} color={theme.colors.textSecondary} strokeWidth={2} />
                 <ThemedText type="secondary" style={styles.locationText} numberOfLines={1}>
-                  {item.location.address}
+                  {item.lat.toFixed(5)}, {item.lon.toFixed(5)}
                 </ThemedText>
               </View>
             )}
             
-            {item.videoUrl && (
+            {/* Show video indicator if files are available */}
+            {item.files && item.files.length > 0 && (
               <View style={styles.videoIndicator}>
                 <Video size={14} color={theme.colors.primary} strokeWidth={2} />
                 <ThemedText type="secondary" style={[styles.videoText, { color: theme.colors.primary }]}>
-                  Video Available
+                  {item.files.length} Video{item.files.length > 1 ? 's' : ''}
                 </ThemedText>
               </View>
+            )}
+            
+            {/* Show speed if available */}
+            {item.speed !== undefined && item.speed > 0 && (
+              <ThemedText type="secondary" style={styles.speedText}>
+                {item.speed} mph
+              </ThemedText>
             )}
           </View>
         </View>
@@ -288,15 +359,15 @@ export default function EventsScreen() {
     <TouchableOpacity
       style={[
         styles.filterButton,
-        filter === filterValue && { backgroundColor: theme.colors.primary },
-        { borderColor: theme.colors.primary }
+        filter === filterValue && { backgroundColor: '#00ACB4' },
+        { borderColor: '#00ACB4' }
       ]}
       onPress={() => setFilter(filterValue)}
       activeOpacity={0.7}
     >
       <ThemedText style={[
         styles.filterButtonText,
-        { color: filter === filterValue ? '#FFFFFF' : theme.colors.primary }
+        { color: filter === filterValue ? '#FFFFFF' : '#00ACB4' }
       ]}>
         {title}
       </ThemedText>
@@ -376,7 +447,6 @@ export default function EventsScreen() {
       {/* Filter buttons */}
       <View style={styles.filterContainer}>
         <FilterButton title="All" filterValue="all" />
-        <FilterButton title="Critical" filterValue="critical" />
         <FilterButton title="Today" filterValue="today" />
       </View>
 
@@ -389,8 +459,6 @@ export default function EventsScreen() {
           <ThemedText type="secondary" style={styles.emptySubtitle}>
             {filter === 'all' 
               ? "No events recorded for this device."
-              : filter === 'critical'
-              ? "No critical events found."
               : "No events recorded today."
             }
           </ThemedText>
@@ -399,7 +467,7 @@ export default function EventsScreen() {
         <FlatList
           data={filteredEvents}
           renderItem={renderEvent}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -408,11 +476,42 @@ export default function EventsScreen() {
               colors={[theme.colors.primary]}
             />
           }
+          onEndReached={loadMoreEvents}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.loadingFooter}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <ThemedText type="secondary" style={styles.loadingText}>
+                  Loading more events...
+                </ThemedText>
+              </View>
+            ) : !hasMore && events.length > 0 ? (
+              <View style={styles.loadingFooter}>
+                <ThemedText type="secondary" style={styles.loadingText}>
+                  No more events
+                </ThemedText>
+              </View>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
           removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={10}
           windowSize={10}
+        />
+      )}
+
+      {/* Event Detail Modal */}
+      {selectedEventId && user?.imei && (
+        <EventDetailModal
+          visible={modalVisible}
+          eventId={selectedEventId}
+          imei={user.imei}
+          onClose={() => {
+            setModalVisible(false);
+            setSelectedEventId(null);
+          }}
         />
       )}
     </ThemedView>
@@ -422,6 +521,15 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   listContainer: {
     paddingVertical: 8,
+  },
+  loadingFooter: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -443,7 +551,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 2,
+    borderColor: '#00ACB4',
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -524,6 +633,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 6,
     fontWeight: '500',
+  },
+  speedText: {
+    fontSize: 12,
+    marginLeft: 4,
   },
   emptyTitle: {
     marginTop: 16,

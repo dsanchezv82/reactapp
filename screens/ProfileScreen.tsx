@@ -1,16 +1,13 @@
 import { LogOut, Settings, Shield, User } from 'lucide-react-native';
-import { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ThemedText from '../components/ThemedText';
 import ThemedView from '../components/ThemedView';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { getUserDevice } from '../utils/deviceApi';
 
 export default function ProfileScreen() {
   const { logout, user, authToken } = useAuth();
-  const { theme, isDark } = useTheme();
-  const [deviceInfo, setDeviceInfo] = useState<string>('');
+  const { theme } = useTheme();
 
   const handleLogout = async () => {
     Alert.alert(
@@ -38,33 +35,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleCheckDevice = async () => {
-    if (!authToken || !user?.userId) {
-      Alert.alert('Error', 'Not authenticated');
-      return;
-    }
-
-    console.log('🔍 Checking for device...');
-    setDeviceInfo('Loading...');
-    
-    const result = await getUserDevice(authToken, user.userId);
-    
-    if (result.hasDevice) {
-      const info = `✅ Device found!\nHas GPS data: ${result.gpsData ? 'Yes' : 'No'}`;
-      setDeviceInfo(info);
-      Alert.alert('Device Status', info);
-    } else {
-      let info = `❌ No device registered or error occurred\n\n`;
-      if (result.error?.includes('Something went wrong')) {
-        info += `Backend Error: The server encountered an error.\n\nThis usually means:\n• No device is associated with your account\n• The backend needs to register a device for User ID: ${user.userId}\n\nPlease contact your backend team to:\n1. Register a device with an IMEI\n2. Associate it with your user account`;
-      } else {
-        info += result.error || 'Unknown error';
-      }
-      setDeviceInfo(info);
-      Alert.alert('Device Status', info, [{ text: 'OK' }]);
-    }
-  };
-
   return (
     <ThemedView style={styles.container}>
       <ThemedView surface style={styles.header}>
@@ -74,36 +44,19 @@ export default function ProfileScreen() {
         <ThemedText type="title" style={styles.username}>
           {user?.firstName || user?.username || 'User'}
         </ThemedText>
-        <ThemedText type="secondary" style={styles.email}>
-          {user?.email || 'No email'}
-        </ThemedText>
         {user?.userId && (
           <ThemedText type="secondary" style={{ fontSize: 12, marginTop: 4 }}>
             User ID: {user.userId} | Role: {user.role}
           </ThemedText>
         )}
+        {user?.imei && (
+          <ThemedText type="secondary" style={{ fontSize: 12, marginTop: 2, color: theme.colors.textSecondary }}>
+            IMEI: {user.imei}
+          </ThemedText>
+        )}
       </ThemedView>
 
       <View style={styles.content}>
-        <View style={styles.section}>
-          <ThemedText type="secondary" style={styles.sectionTitle}>Device</ThemedText>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, { borderBottomColor: theme.colors.border }]}
-            onPress={handleCheckDevice}
-          >
-            <Shield size={20} color={theme.colors.textSecondary} strokeWidth={2} />
-            <ThemedText style={styles.menuItemText}>Check Device Status</ThemedText>
-            <ThemedText type="secondary" style={styles.menuItemArrow}>›</ThemedText>
-          </TouchableOpacity>
-          
-          {deviceInfo ? (
-            <View style={[styles.deviceInfo, { backgroundColor: theme.colors.surface }]}>
-              <ThemedText type="secondary" style={{ fontSize: 12 }}>{deviceInfo}</ThemedText>
-            </View>
-          ) : null}
-        </View>
-
         <View style={styles.section}>
           <ThemedText type="secondary" style={styles.sectionTitle}>Account</ThemedText>
           

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import contexts
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { GPSProvider } from './contexts/GPSContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 // Import components
@@ -44,7 +45,7 @@ function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: '#00ACB4',
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: {
           height: Platform.OS === 'ios' ? 88 : 70,
@@ -62,7 +63,7 @@ function MainTabNavigator() {
         component={LandingScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Home size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
@@ -70,8 +71,9 @@ function MainTabNavigator() {
         name="Video" 
         component={VideoScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ focused, color }) => (
-            <Camera size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <Camera size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
@@ -80,7 +82,7 @@ function MainTabNavigator() {
         component={EventsScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <Calendar size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <Calendar size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
@@ -89,7 +91,7 @@ function MainTabNavigator() {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <User size={focused ? 26 : 24} color={color} strokeWidth={2} />
+            <User size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
@@ -145,9 +147,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <SafeAreaProvider>
-          <AppNavigator />
-        </SafeAreaProvider>
+        <GPSProvider>
+          <SafeAreaProvider>
+            <AppNavigator />
+          </SafeAreaProvider>
+        </GPSProvider>
       </AuthProvider>
     </ThemeProvider>
   );

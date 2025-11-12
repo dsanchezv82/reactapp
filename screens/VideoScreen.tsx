@@ -227,22 +227,20 @@ export default function VideoScreen(): React.JSX.Element {
           StatusBar.setHidden(false, 'slide');
           StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
           
-          // Restore tab bar with theme colors
+          // Restore tab bar with exact original configuration from App.tsx
           const rootNavigator = navigation.getParent();
           const tabNavigator = rootNavigator?.getParent();
           
           const originalTabBarStyle = {
-            display: 'flex' as const,
+            height: Platform.OS === 'ios' ? 88 : 70,
+            paddingBottom: Platform.OS === 'ios' ? 34 : 10,
+            paddingTop: 8,
             backgroundColor: theme.colors.surface,
-            borderTopColor: theme.colors.border,
             borderTopWidth: StyleSheet.hairlineWidth,
-            height: Platform.OS === 'ios' ? 90 : 60,
-            position: 'relative' as const,
-            bottom: 0,
-            opacity: 1,
+            borderTopColor: theme.colors.border,
           };
           
-          // Restore all navigation levels with theme styling
+          // Restore all navigation levels with exact original styling
           if (parentNavigator.current) {
             parentNavigator.current.setOptions({ tabBarStyle: originalTabBarStyle });
           }
@@ -290,14 +288,12 @@ export default function VideoScreen(): React.JSX.Element {
         StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
         
         const originalTabBarStyle = {
-          display: 'flex' as const,
+          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 34 : 10,
+          paddingTop: 8,
           backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: Platform.OS === 'ios' ? 90 : 60,
-          position: 'relative' as const,
-          bottom: 0,
-          opacity: 1,
+          borderTopColor: theme.colors.border,
         };
         
         // Restore tab bar at all navigation levels
@@ -629,7 +625,6 @@ export default function VideoScreen(): React.JSX.Element {
   return (
     <ThemedView style={dynamicStyles.container}>
       <ThemedView surface style={dynamicStyles.header}>
-        
         <View style={dynamicStyles.headerIcon}>
           <Camera size={32} color={theme.colors.primary} strokeWidth={2} />
         </View>
@@ -640,7 +635,6 @@ export default function VideoScreen(): React.JSX.Element {
       <ScrollView 
         style={styles.content} 
         showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
       >
         <View style={styles.videoContainer}>
           <VideoView

@@ -1,11 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { Video } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
+import { useGPS } from '../contexts/GPSContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 // Backend API configuration for real-time map data
@@ -39,10 +40,7 @@ interface ApiResponse<T> {
 
 export default function LandingScreen({ navigation }: any) {
   const [mapData, setMapData] = useState<MapLocation[]>([]);
-  const [gpsHistory, setGpsHistory] = useState<GpsDataPoint[]>([]);
-  const [lastGpsUpdate, setLastGpsUpdate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -54,10 +52,13 @@ export default function LandingScreen({ navigation }: any) {
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+  const [wasStationary, setWasStationary] = useState<boolean>(false);
   
   const { theme } = useTheme();
   const { authToken, user } = useAuth();
+  const { gpsHistory, lastGpsUpdate, refreshGpsData, isUsingCachedData, error: gpsError } = useGPS();
   const insets = useSafeAreaInsets();
+  const mapRef = useRef<MapView>(null);
 
   // Request location permissions and get current location
   const requestLocationPermission = async () => {
@@ -78,32 +79,20 @@ export default function LandingScreen({ navigation }: any) {
       }
       
       if (status !== 'granted') {
-        console.log('❌ Location permission denied - using demo location');
+        console.log('❌ Location permission denied');
         Alert.alert(
-          'Location Permission',
-          'Location access is needed to show your position on the map. Using demo location for now.',
+          'Location Permission Required',
+          'Location access is needed to show your position on the map.',
           [
             {
-              text: 'Settings',
+              text: 'Open Settings',
               onPress: () => {
-                // You can add deep link to settings if needed
                 Alert.alert('Settings', 'Please enable location access in your device settings.');
               }
             },
-            { text: 'Use Demo Location', style: 'cancel' }
+            { text: 'OK', style: 'cancel' }
           ]
         );
-        // Still use demo location but let user know
-        const demoLat = 37.78825;
-        const demoLng = -122.4324;
-        setCurrentLocation({ latitude: demoLat, longitude: demoLng });
-        setMapRegion({
-          latitude: demoLat,
-          longitude: demoLng,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
-        generateSampleData(demoLat, demoLng);
         setLoading(false);
         return false;
       }
@@ -131,278 +120,159 @@ export default function LandingScreen({ navigation }: any) {
       console.log('📍 Current location:', latitude, longitude);
       console.log('🗺️ Updated map region to:', newRegion);
 
-      // Generate sample data points around current location
-      generateSampleData(latitude, longitude);
-      
       setLoading(false);
       return true;
     } catch (error) {
       console.log('❌ Error getting your location:', error);
       Alert.alert(
-        'Location Error', 
-        'Unable to get your current location. This might be due to location services being disabled or GPS signal issues. Using demo location for now.',
+        'Location Error',
+        'Unable to get your current location. Please check that location services are enabled and that the camera has been turned on.',
         [
           {
-            text: 'Retry Location',
+            text: 'Retry',
             onPress: () => {
-              // Retry getting location
               setTimeout(() => requestLocationPermission(), 1000);
             }
           },
-          { text: 'Use Demo Location', style: 'cancel' }
+          { text: 'OK', style: 'cancel' }
         ]
       );
-      
-      // Fallback to San Francisco
-      const fallbackLat = 37.78825;
-      const fallbackLng = -122.4324;
-      setCurrentLocation({ latitude: fallbackLat, longitude: fallbackLng });
-      setMapRegion({
-        latitude: fallbackLat,
-        longitude: fallbackLng,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      });
-      generateSampleData(fallbackLat, fallbackLng);
       
       setLoading(false);
       return false;
     }
   };
 
-  // Static pins that you can customize
-  const generateSampleData = (centerLat: number, centerLng: number) => {
-    const staticLocations: MapLocation[] = [
-      {
-        id: '1',
-        latitude: centerLat + 0.01,
-        longitude: centerLng + 0.009,
-        title: 'Oli - Nissan Rogue',
-        description: 'Distracted Driving at 35 mph',
-        type: 'alert',
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        latitude: centerLat - 0.008,
-        longitude: centerLng + 0.012,
-        title: 'Alert Pin',
-        description: 'Description of the alert',
-        type: 'alert',
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        latitude: centerLat + 0.015,
-        longitude: centerLng - 0.008,
-        title: 'Checkpoint Pin',
-        description: 'Description of the checkpoint',
-        type: 'checkpoint',
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: '4',
-        latitude: centerLat - 0.012,
-        longitude: centerLng - 0.015,
-        title: 'Vehicle Pin',
-        description: 'This can be something else',
-        type: 'vehicle',
-        timestamp: new Date().toISOString(),
-      },
-    ];
-
-    setMapData(staticLocations);
-    console.log('✅ Set up 4 static pins for customization');
-  };
-
-  // Load real-time map data from backend
-  // Fetch GPS data from backend
-  const fetchGpsData = async (isBackgroundRefresh: boolean = false) => {
-    if (!authToken || !user?.userId) {
-      console.log('⚠️ Cannot fetch GPS data: missing auth or userId');
+  // Process GPS data from context and convert to map markers
+  const processGpsDataForMap = useCallback(() => {
+    if (!gpsHistory || gpsHistory.length === 0) {
+      console.log('ℹ️ No GPS data available from context');
+      if (mapData.length > 0) {
+        setMapData([]);
+      }
       return;
     }
+
+    // Filter for valid GPS points
+    const validGpsPoints = gpsHistory.filter((point: GpsDataPoint) => 
+      point.latitude && 
+      point.longitude && 
+      !isNaN(point.latitude) && 
+      !isNaN(point.longitude) &&
+      point.latitude !== 0 &&
+      point.longitude !== 0 &&
+      Math.abs(point.latitude) <= 90 &&
+      Math.abs(point.longitude) <= 180
+    );
     
-    try {
-      // Only show loading indicator for initial fetch, not for auto-refresh
-      if (!isBackgroundRefresh) {
-        setLoading(true);
+    // Sort by timestamp (newest first), then take the 20 most recent for display
+    const sortedByTime = validGpsPoints.sort((a: GpsDataPoint, b: GpsDataPoint) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    
+    // Take the 20 newest points and reverse to show oldest->newest on map
+    const latest20Points = sortedByTime.slice(0, 20).reverse();
+    
+    // Convert GPS data to map markers
+    const markers: MapLocation[] = latest20Points
+      .map((point: GpsDataPoint, index: number) => ({
+        id: `gps-${index}`,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        title: index === latest20Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
+        description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` • ${point.speed.toFixed(1)} mph` : ''}`,
+        type: index === latest20Points.length - 1 ? 'vehicle' : 'checkpoint',
+        timestamp: point.timestamp,
+        speed: point.speed,
+      }));
+    
+    // Only update if data actually changed - compare latest timestamp and count
+    if (markers.length > 0) {
+      const hasChanged = 
+        mapData.length !== markers.length ||
+        mapData.length === 0 ||
+        (mapData[mapData.length - 1]?.timestamp !== markers[markers.length - 1]?.timestamp);
+      
+      if (hasChanged) {
+        setMapData(markers);
+        console.log('✅ GPS markers updated:', markers.length, 'points');
       }
-      console.log('� Fetching GPS data for userId:', user.userId);
-      
-      // Get GPS data for the last 24 hours
-      const endDate = new Date();
-      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
-      
-      // Use full ISO 8601 format (date-time) as required by Surfsight API
-      const startStr = startDate.toISOString();
-      const endStr = endDate.toISOString();
-      
-      const url = `${API_BASE_URL}/devices/${user.userId}/gps?start=${encodeURIComponent(startStr)}&end=${encodeURIComponent(endStr)}`;
-      console.log('📡 GPS API URL:', url);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`GPS API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('📊 GPS data array length:', data.gpsData?.length || 0);
-
-      if (data.gpsData && Array.isArray(data.gpsData) && data.gpsData.length > 0) {
-        // Transform API data (lat/lon) to our format (latitude/longitude)
-        const transformedData = data.gpsData.map((point: any) => ({
-          latitude: point.lat,
-          longitude: point.lon,
-          timestamp: new Date(point.time * 1000).toISOString(), // Convert Unix timestamp to ISO string
-          speed: point.speed,
-          heading: point.heading,
-          accuracy: point.accuracy,
-        }));
-        
-        // Sort by timestamp and get the 4 most recent points for logging
-        const sortedForLogging = [...transformedData].sort((a: GpsDataPoint, b: GpsDataPoint) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        const latest4 = sortedForLogging.slice(0, 4);
-        console.log('✅ Latest 4 GPS points (by timestamp):', latest4.map((p: GpsDataPoint) => ({
-          lat: p.latitude,
-          lon: p.longitude,
-          speed: p.speed,
-          time: p.timestamp
-        })));
-        
-        setGpsHistory(transformedData);
-        setLastGpsUpdate(new Date());
-        
-        // First filter for valid GPS points
-        const validGpsPoints = transformedData.filter((point: GpsDataPoint) => 
-          point.latitude && 
-          point.longitude && 
-          !isNaN(point.latitude) && 
-          !isNaN(point.longitude) &&
-          point.latitude !== 0 &&
-          point.longitude !== 0 &&
-          Math.abs(point.latitude) <= 90 &&
-          Math.abs(point.longitude) <= 180
-        );
-        
-        // Sort by timestamp (newest first), then take the 20 most recent for display
-        const sortedByTime = validGpsPoints.sort((a: GpsDataPoint, b: GpsDataPoint) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        
-        // Take the 20 newest points and reverse to show oldest->newest on map
-        const latest20Points = sortedByTime.slice(0, 20).reverse();
-        
-        // Log only the 4 most recent (for debugging)
-        const latest4ForLogging = sortedByTime.slice(0, 4);
-        console.log(`🗺️ Valid GPS points: ${validGpsPoints.length}, displaying 20, logging latest 4:`, 
-          latest4ForLogging.map((p: GpsDataPoint) => ({lat: p.latitude, lon: p.longitude, time: p.timestamp}))
-        );
-        
-        // Convert GPS data to map markers
-        const markers: MapLocation[] = latest20Points
-          .map((point: GpsDataPoint, index: number) => ({
-            id: `gps-${index}`,
-            latitude: point.latitude,
-            longitude: point.longitude,
-            title: index === latest20Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
-            description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` • ${point.speed.toFixed(1)} mph` : ''}`,
-            type: index === latest20Points.length - 1 ? 'vehicle' : 'checkpoint',
-            timestamp: point.timestamp,
-            speed: point.speed,
-          }));
-        
-        if (markers.length > 0) {
-          setMapData(markers);
-          
-          // Only center map on latest GPS point during initial load, not during auto-refresh
-          if (!isBackgroundRefresh) {
-            const latestPoint = latest20Points[latest20Points.length - 1];
-            if (latestPoint.latitude && latestPoint.longitude && 
-                !isNaN(latestPoint.latitude) && !isNaN(latestPoint.longitude) &&
-                latestPoint.latitude !== 0 && latestPoint.longitude !== 0) {
-              setMapRegion({
-                latitude: latestPoint.latitude,
-                longitude: latestPoint.longitude,
-                latitudeDelta: 0.01, // Zoom in closer
-                longitudeDelta: 0.01,
-              });
-            }
-          }
-          
-          const latestPoint = latest20Points[latest20Points.length - 1];
-          console.log('✅ GPS markers created:', markers.length, 'points (displaying 20)');
-          console.log('📍 Latest location:', latestPoint.latitude, latestPoint.longitude);
-        } else {
-          console.log('⚠️ No valid GPS coordinates found in data');
-        }
-      } else {
-        console.log('ℹ️ No GPS data available for this time range');
-      }
-    } catch (error) {
-      console.error('❌ Error fetching GPS data:', error instanceof Error ? error.message : String(error));
-      Alert.alert('GPS Error', 'Failed to load vehicle location data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    } else if (mapData.length > 0) {
+      console.log('⚠️ No valid GPS coordinates found in data');
+      setMapData([]);
     }
-  };
+  }, [gpsHistory, mapData]);
 
-  // Initialize location and load GPS data when screen is focused
+  // Initialize location and process GPS data when screen is focused
   useFocusEffect(
     useCallback(() => {
-      // Don't run if user is not authenticated
       if (!user?.userId || !authToken) {
         console.log('⏸️ Waiting for user authentication...');
         return;
       }
 
       console.log('🚀 LandingScreen focused, requesting location...');
-      
-      // Set loading state and clear map data to prevent showing stale trail
       setLoading(true);
-      setMapData([]);
       
       const initializeLocation = async () => {
-        // First request location permission and get current location
+        // Request location permission and get current location
         await requestLocationPermission();
         
-        // Load GPS data from backend (with loading indicator)
-        await fetchGpsData(false);
+        setLoading(false);
       };
       
       initializeLocation();
-      
-      // Set up auto-refresh every 30 seconds for real-time GPS updates (only when screen is focused)
-      const interval = setInterval(() => {
-        console.log('🔄 Auto-refreshing GPS data...');
-        fetchGpsData(true); // Pass true for background refresh (no loading indicator)
-      }, 30000); // 30 seconds
-      
-      // Cleanup: stop auto-refresh when screen loses focus
-      return () => {
-        console.log('⏸️ LandingScreen unfocused, stopping GPS auto-refresh');
-        clearInterval(interval);
-      };
     }, [authToken, user?.userId])
   );
 
-  // Debug: Monitor mapData changes
+  // Update map markers whenever GPS data changes (from global context)
   useEffect(() => {
-    console.log('🗺️ mapData state updated:', mapData.length, 'markers');
-    if (mapData.length > 0) {
-      console.log('📍 First marker:', mapData[0]);
+    processGpsDataForMap();
+  }, [gpsHistory, processGpsDataForMap]);
+
+  // Memoize stationary check to prevent recalculating on every render
+  const isVehicleStationary = useMemo(() => {
+    if (!mapData || mapData.length === 0) return false;
+    
+    const latestPoint = mapData[mapData.length - 1];
+    const hasZeroSpeed = !latestPoint.speed || latestPoint.speed < 3;
+    
+    const latestTimestamp = new Date(latestPoint.timestamp).getTime();
+    const currentTime = new Date().getTime();
+    const timeDifferenceMinutes = (currentTime - latestTimestamp) / (1000 * 60);
+    const isDataStale = timeDifferenceMinutes >= 5;
+    
+    let isDeviceOnStandby = false;
+    if (mapData.length >= 2) {
+      const previousPoint = mapData[mapData.length - 2];
+      isDeviceOnStandby = 
+        latestPoint.latitude === previousPoint.latitude &&
+        latestPoint.longitude === previousPoint.longitude &&
+        latestPoint.speed === previousPoint.speed &&
+        latestPoint.timestamp === previousPoint.timestamp;
     }
+    
+    const isStationary = (hasZeroSpeed && isDataStale) || (isDeviceOnStandby && isDataStale);
+    
+    // Log stationary status (but only when it changes)
+    if (isStationary) {
+      const reason = isDeviceOnStandby ? 'device on standby' : 'speed: 0';
+      const minutes = timeDifferenceMinutes.toFixed(1);
+      console.log(`🅿️ Vehicle stationary - hiding trail (${reason} for ${minutes} minutes)`);
+    }
+    
+    return isStationary;
   }, [mapData]);
+
+  // Log only when stationary state changes
+  useEffect(() => {
+    if (isVehicleStationary !== wasStationary) {
+      setWasStationary(isVehicleStationary);
+      if (!isVehicleStationary && wasStationary) {
+        console.log('🚗 Vehicle is now moving - showing trail');
+      }
+    }
+  }, [isVehicleStationary, wasStationary]);
 
   // Zoom functions
   const zoomIn = () => {
@@ -421,12 +291,31 @@ export default function LandingScreen({ navigation }: any) {
     }));
   };
 
+  // Recenter map on current GPS location and refresh GPS data
+  const recenterMap = async () => {
+    if (mapData.length > 0) {
+      const latestLocation = mapData[mapData.length - 1];
+      const newRegion = {
+        latitude: latestLocation.latitude,
+        longitude: latestLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      };
+      mapRef.current?.animateToRegion(newRegion, 500);
+      console.log('🎯 Recentered map on current location:', latestLocation.latitude, latestLocation.longitude);
+    }
+    
+    // Also refresh GPS data to get latest coordinates
+    await refreshGpsData();
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Real-Time Map - Full screen */}
       <View style={styles.mapContainer}>
         {/* Real-Time Interactive Map with Current Location */}
         <MapView
+          ref={mapRef}
           style={styles.map}
           region={mapRegion}
           onRegionChangeComplete={setMapRegion}
@@ -441,42 +330,7 @@ export default function LandingScreen({ navigation }: any) {
           rotateEnabled={true}
         >
           {/* Dotted line connecting GPS points - only show if car is moving, color by speed */}
-          {!loading && mapData.length > 1 && (() => {
-            // Check if car is currently stationary
-            const latestPoint = mapData[mapData.length - 1];
-            
-            // Check if latest point has very low speed (< 3 mph - essentially stopped/idling)
-            const hasZeroSpeed = !latestPoint.speed || latestPoint.speed < 3;
-            
-            // Check if latest point is 5 minutes or older (stale data)
-            const latestTimestamp = new Date(latestPoint.timestamp).getTime();
-            const currentTime = new Date().getTime();
-            const timeDifferenceMinutes = (currentTime - latestTimestamp) / (1000 * 60);
-            const isDataStale = timeDifferenceMinutes >= 5;
-            
-            // Check if the last two points are identical (device on standby - no new data)
-            let isDeviceOnStandby = false;
-            if (mapData.length >= 2) {
-              const previousPoint = mapData[mapData.length - 2];
-              isDeviceOnStandby = 
-                latestPoint.latitude === previousPoint.latitude &&
-                latestPoint.longitude === previousPoint.longitude &&
-                latestPoint.speed === previousPoint.speed &&
-                latestPoint.timestamp === previousPoint.timestamp;
-            }
-            
-            // Car is stationary if:
-            // 1. Speed is 0 AND data is 5+ minutes old, OR
-            // 2. GPS data hasn't changed in 5+ minutes (device on standby)
-            const isStationary = (hasZeroSpeed && isDataStale) || (isDeviceOnStandby && isDataStale);
-            
-            // Don't show trail if car is currently stationary
-            if (isStationary) {
-              const reason = isDeviceOnStandby ? 'device on standby' : 'speed: 0';
-              console.log('🅿️ Vehicle stationary - hiding trail (', reason, 'for', timeDifferenceMinutes.toFixed(1), 'minutes)');
-              return null;
-            }
-            
+          {!loading && mapData.length > 1 && !isVehicleStationary && (() => {
             // Function to get color based on speed (in mph)
             const getSpeedColor = (speed?: number): string => {
               if (!speed || speed < 0) return '#87CEEB'; // Light blue for 0-20 mph (default)
@@ -545,15 +399,35 @@ export default function LandingScreen({ navigation }: any) {
           </View>
         )}
         
+        {/* GPS Status Banner - top center */}
+        {(isUsingCachedData || gpsError) && (
+          <View style={[styles.statusBanner, { 
+            backgroundColor: isUsingCachedData ? '#FF9500' : '#FF3B30',
+            borderBottomColor: theme.colors.border,
+            top: insets.top
+          }]}>
+            <Text style={styles.statusBannerText}>
+              {isUsingCachedData 
+                ? '📦 Showing last known location' 
+                : '⚠️ GPS connection error'}
+            </Text>
+            {lastGpsUpdate && (
+              <Text style={styles.statusBannerSubtext}>
+                Last updated: {new Date(lastGpsUpdate).toLocaleTimeString()}
+              </Text>
+            )}
+          </View>
+        )}
+        
         {/* Control buttons overlay - top right */}
-        <View style={styles.controlsOverlay}>
-          {/* GPS data refresh button */}
+        <View style={[styles.controlsOverlay, { top: insets.top + (isUsingCachedData || gpsError ? 60 : 0) }]}>
+          {/* Recenter map and refresh GPS button */}
           <TouchableOpacity 
             style={[styles.refreshButton, { 
-              backgroundColor: '#34C759', // Green for GPS refresh
+              backgroundColor: '#34C759', // Green for recenter + refresh
               opacity: loading ? 0.7 : 1
             }]}
-            onPress={() => fetchGpsData(false)}
+            onPress={recenterMap}
             disabled={loading}
           >
             <Text style={styles.refreshButtonText}>
@@ -837,6 +711,33 @@ const styles = StyleSheet.create({
   speedLegendText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+  statusBanner: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  statusBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  statusBannerSubtext: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 11,
+    fontWeight: '400',
+    textAlign: 'center',
+    marginTop: 2,
   },
 });
 

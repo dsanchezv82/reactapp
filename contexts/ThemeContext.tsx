@@ -55,10 +55,10 @@ const darkTheme: Theme = {
   isDark: true,
 };
 
-interface ThemeContextType {
+type ThemeContextType = {
   theme: Theme;
   isDark: boolean;
-}
+};
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -78,36 +78,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const systemTheme = Appearance.getColorScheme();
     const initialIsDark = systemTheme === 'dark';
     setIsDark(initialIsDark);
-    console.log('🎨 ThemeProvider mounted');
-    console.log('🎨 System color scheme:', systemTheme);
-    console.log('🎨 Initial isDark state:', initialIsDark);
 
     // Listen for system appearance changes
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      console.log('🔔 Appearance change detected!');
-      console.log('🎨 New color scheme:', colorScheme);
       const isDarkMode = colorScheme === 'dark';
       setIsDark(isDarkMode);
-      console.log('🎨 Updated isDark state to:', isDarkMode);
     });
 
     // Cleanup listener on unmount
     return () => {
-      console.log('🎨 ThemeProvider unmounting, removing listener');
       subscription.remove();
     };
   }, []);
 
   const theme = isDark ? darkTheme : lightTheme;
-
-  // Debug current theme state
-  console.log('🎨 CURRENT THEME STATE:', {
-    isDark,
-    background: theme.colors.background,
-    surface: theme.colors.surface,
-    text: theme.colors.text
-  });
-
   return (
     <ThemeContext.Provider value={{ theme, isDark }}>
       {children}
