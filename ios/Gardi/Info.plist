@@ -19,7 +19,7 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.1</string>
+	<string>1.0.3</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -32,7 +32,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>4</string>
 	<key>EXDefaultScreenOrientationMask</key>
 	<string>UIInterfaceOrientationMaskAllButUpsideDown</string>
 	<key>LSMinimumSystemVersion</key>
@@ -46,6 +46,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to enable video monitoring and live streaming from vehicle device.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone to receive audio from your vehicle device.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>This app uses Face ID for secure authentication.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

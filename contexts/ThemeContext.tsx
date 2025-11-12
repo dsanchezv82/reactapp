@@ -39,13 +39,13 @@ const lightTheme: Theme = {
 
 const darkTheme: Theme = {
   colors: {
-    background: '#000000',
-    surface: '#1C1C1E',
-    primary: '#0A84FF',
-    secondary: '#2C2C2E',
+    background: '#0A0A0A',      // Custom dark background (almost black with slight warmth)
+    surface: '#1A1A1A',         // Custom dark surface
+    primary: '#00ACB4',         // Gardi teal brand color
+    secondary: '#1E2A2D',       // Darker teal-tinted secondary
     text: '#FFFFFF',
-    textSecondary: '#8E8E93',
-    border: '#38383A',
+    textSecondary: '#A0A0A0',   // Slightly lighter secondary text
+    border: '#2A2A2A',          // Subtle border
     shadow: '#000000',
     overlay: 'rgba(0, 0, 0, 0.5)',
     success: '#30D158',
