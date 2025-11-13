@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 
 const API_BASE_URL = 'https://api.garditech.com/api';
 const GPS_CACHE_KEY = '@gps_history_cache';
+const TRIPS_CACHE_KEY = '@gps_trips_history';
 
 interface GpsDataPoint {
   latitude: number;
@@ -14,6 +15,17 @@ interface GpsDataPoint {
   accuracy?: number;
 }
 
+interface TripData {
+  id: string;
+  startTime: string;
+  endTime: string;
+  gpsPoints: GpsDataPoint[];
+  distance: number;
+  maxSpeed: number;
+  avgSpeed: number;
+  pointCount: number;
+}
+
 interface GPSContextType {
   gpsHistory: GpsDataPoint[];
   lastGpsUpdate: Date | null;
@@ -21,6 +33,8 @@ interface GPSContextType {
   error: string | null;
   refreshGpsData: () => Promise<void>;
   isUsingCachedData: boolean;
+  savedTrips: TripData[];
+  getSavedTrips: () => Promise<TripData[]>;
 }
 
 const GPSContext = createContext<GPSContextType | undefined>(undefined);
@@ -32,12 +46,92 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUsingCachedData, setIsUsingCachedData] = useState(false);
+  const [savedTrips, setSavedTrips] = useState<TripData[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load cached GPS data on mount
   useEffect(() => {
     loadCachedGpsData();
+    loadSavedTrips();
   }, []);
+
+  // Helper: Calculate distance between two GPS points (Haversine formula)
+  const calculateDistance = (points: GpsDataPoint[]): number => {
+    if (points.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const lat1 = points[i].latitude * Math.PI / 180;
+      const lat2 = points[i + 1].latitude * Math.PI / 180;
+      const deltaLat = (points[i + 1].latitude - points[i].latitude) * Math.PI / 180;
+      const deltaLon = (points[i + 1].longitude - points[i].longitude) * Math.PI / 180;
+      
+      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                Math.cos(lat1) * Math.cos(lat2) *
+                Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = 6371 * c; // Earth radius in km
+      
+      totalDistance += distance;
+    }
+    
+    return totalDistance * 0.621371; // Convert km to miles
+  };
+
+  // Save a completed trip to storage
+  const saveTripToCache = async (trip: TripData) => {
+    try {
+      // Load existing trips
+      const existing = await AsyncStorage.getItem(TRIPS_CACHE_KEY);
+      const trips: TripData[] = existing ? JSON.parse(existing) : [];
+      
+      // Add new trip
+      trips.push(trip);
+      
+      // Filter out trips older than 7 days
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const recentTrips = trips.filter(t => new Date(t.endTime).getTime() > sevenDaysAgo);
+      
+      // Save filtered trips
+      await AsyncStorage.setItem(TRIPS_CACHE_KEY, JSON.stringify(recentTrips));
+      setSavedTrips(recentTrips);
+      
+      console.log(`💾 [GPSContext] Saved trip ${trip.id} (${trip.pointCount} points, ${trip.distance.toFixed(2)} miles)`);
+      console.log(`📊 [GPSContext] Total saved trips: ${recentTrips.length}`);
+    } catch (err) {
+      console.error('❌ [GPSContext] Error saving trip:', err);
+    }
+  };
+
+  // Load saved trips from storage
+  const loadSavedTrips = async () => {
+    try {
+      const cached = await AsyncStorage.getItem(TRIPS_CACHE_KEY);
+      if (cached) {
+        const trips: TripData[] = JSON.parse(cached);
+        
+        // Filter out trips older than 7 days
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const recentTrips = trips.filter(t => new Date(t.endTime).getTime() > sevenDaysAgo);
+        
+        setSavedTrips(recentTrips);
+        console.log(`📦 [GPSContext] Loaded ${recentTrips.length} saved trips`);
+        
+        // Update cache if we filtered any old trips
+        if (recentTrips.length !== trips.length) {
+          await AsyncStorage.setItem(TRIPS_CACHE_KEY, JSON.stringify(recentTrips));
+        }
+      }
+    } catch (err) {
+      console.error('❌ [GPSContext] Error loading saved trips:', err);
+    }
+  };
+
+  // Get saved trips (exposed to consumers)
+  const getSavedTrips = async (): Promise<TripData[]> => {
+    await loadSavedTrips();
+    return savedTrips;
+  };
 
   const loadCachedGpsData = async () => {
     try {
@@ -123,24 +217,88 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
           accuracy: point.accuracy,
         }));
         
-        // Sort by timestamp and get the 4 most recent points for logging
-        const sortedForLogging = [...transformedData].sort((a: GpsDataPoint, b: GpsDataPoint) => 
+        // Sort by timestamp (newest first)
+        const sortedData = transformedData.sort((a: GpsDataPoint, b: GpsDataPoint) => 
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
-        const latest4 = sortedForLogging.slice(0, 4);
-        console.log('✅ [GPSContext] Latest 4 GPS points:', latest4.map((p: GpsDataPoint) => ({
+        
+        // Filter for current trip only: remove old data if there's a significant time gap
+        // indicating the vehicle was stationary (e.g., stopped at a location)
+        const currentTripData = [];
+        let previousTimestamp = null;
+        const TRIP_GAP_THRESHOLD = 20 * 60 * 1000; // 20 minutes gap = new trip
+        
+        for (const point of sortedData) {
+          const currentTime = new Date(point.timestamp).getTime();
+          
+          if (previousTimestamp === null) {
+            // First point (newest), always include
+            currentTripData.push(point);
+            previousTimestamp = currentTime;
+          } else {
+            const timeDiff = previousTimestamp - currentTime;
+            
+            if (timeDiff < TRIP_GAP_THRESHOLD) {
+              // Part of same trip (less than 20 minute gap)
+              currentTripData.push(point);
+              previousTimestamp = currentTime;
+            } else {
+              // Large time gap found - this is a previous trip, save it before stopping
+              console.log(`🚗 [GPSContext] Trip boundary detected: ${(timeDiff / 1000 / 60).toFixed(1)} minute gap`);
+              
+              // Collect all remaining points for the previous trip
+              const previousTripPoints = [point];
+              let lastTime = currentTime;
+              for (let i = sortedData.indexOf(point) + 1; i < sortedData.length; i++) {
+                const nextPoint = sortedData[i];
+                const nextTime = new Date(nextPoint.timestamp).getTime();
+                const gap = lastTime - nextTime;
+                if (gap < TRIP_GAP_THRESHOLD) {
+                  previousTripPoints.push(nextPoint);
+                  lastTime = nextTime;
+                } else {
+                  break;
+                }
+              }
+              
+              // Save the previous trip if it has enough points
+              if (previousTripPoints.length > 1) {
+                const speeds = previousTripPoints.map(p => p.speed || 0).filter(s => s > 0);
+                const previousTrip: TripData = {
+                  id: `trip_${Date.now()}_${user?.imei}`,
+                  startTime: previousTripPoints[previousTripPoints.length - 1].timestamp,
+                  endTime: previousTripPoints[0].timestamp,
+                  gpsPoints: [...previousTripPoints].reverse(), // chronological order
+                  distance: calculateDistance(previousTripPoints),
+                  maxSpeed: speeds.length > 0 ? Math.max(...speeds) : 0,
+                  avgSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b) / speeds.length : 0,
+                  pointCount: previousTripPoints.length
+                };
+                await saveTripToCache(previousTrip);
+              }
+              
+              break;
+            }
+          }
+        }
+        
+        // Reverse to get chronological order (oldest to newest)
+        const currentTrip = currentTripData.reverse();
+        
+        console.log(`✅ [GPSContext] Filtered to current trip: ${currentTrip.length} points (from ${transformedData.length} total)`);
+        console.log('✅ [GPSContext] Latest 4 GPS points:', currentTrip.slice(-4).map((p: GpsDataPoint) => ({
           lat: p.latitude,
           lon: p.longitude,
           speed: p.speed,
           time: p.timestamp
         })));
         
-        setGpsHistory(transformedData);
+        setGpsHistory(currentTrip);
         setLastGpsUpdate(new Date());
         setIsUsingCachedData(false);
         
-        // Save to cache for offline use
-        await saveCachedGpsData(transformedData);
+        // Save current trip data to cache
+        await saveCachedGpsData(currentTrip);
       } else {
         console.log('ℹ️ [GPSContext] No GPS data available for this time range');
         // If no fresh data but we have cached data, keep showing it
@@ -209,7 +367,7 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, authToken, user?.imei]);
 
   return (
-    <GPSContext.Provider value={{ gpsHistory, lastGpsUpdate, loading, error, refreshGpsData, isUsingCachedData }}>
+    <GPSContext.Provider value={{ gpsHistory, lastGpsUpdate, loading, error, refreshGpsData, isUsingCachedData, savedTrips, getSavedTrips }}>
       {children}
     </GPSContext.Provider>
   );

@@ -23,8 +23,8 @@ const lightTheme: Theme = {
   colors: {
     background: '#F5F5F7',
     surface: '#FFFFFF',
-    primary: '#007AFF',
-    secondary: '#F0F8FF',
+    primary: '#00ACB4',        // Gardi teal brand color
+    secondary: '#E6F7F8',      // Light teal tint
     text: '#1D1D1F',
     textSecondary: '#6E6E73',
     border: '#E5E5EA',

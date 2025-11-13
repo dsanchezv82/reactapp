@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 
 // Polyfill atob for JSC (not available by default, unlike Hermes)
 if (typeof atob === 'undefined') {
@@ -49,6 +49,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   authToken: string | null;
+  requiresReauth: boolean;
+  restoreSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,22 +60,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requiresReauth, setRequiresReauth] = useState(false);
 
   // Check for existing auth on app start - mobile session restoration
   useEffect(() => {
     checkAuthState();
   }, []);
 
+  // Monitor app state to detect when app is killed/backgrounded
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isAuthenticated]);
+
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    console.log('📱 App state changed to:', nextAppState);
+
+    if (nextAppState === 'background' || nextAppState === 'inactive') {
+      // App is going to background or being killed
+      console.log('🔒 App backgrounded - marking session for reauth');
+      await AsyncStorage.setItem('@gardi_requires_reauth', 'true');
+    } else if (nextAppState === 'active') {
+      // App is coming back to foreground
+      const requiresReauth = await AsyncStorage.getItem('@gardi_requires_reauth');
+      
+      if (requiresReauth === 'true' && isAuthenticated) {
+        console.log('🔐 App resumed - requiring re-authentication');
+        setRequiresReauth(true);
+        // Don't clear auth yet - allow Face ID to restore session
+      }
+    }
+  };
+
   const checkAuthState = async () => {
     try {
       const token = await AsyncStorage.getItem('@gardi_auth_token');
       const userData = await AsyncStorage.getItem('@gardi_user_data');
+      const requiresReauth = await AsyncStorage.getItem('@gardi_requires_reauth');
       
       if (token && userData) {
-        setAuthToken(token);
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
-        console.log('✅ Mobile session restored from secure domain');
+        if (requiresReauth === 'true') {
+          // Session exists but requires re-authentication (Face ID)
+          console.log('🔐 Session requires re-authentication');
+          setAuthToken(token);
+          setUser(JSON.parse(userData));
+          setIsAuthenticated(false); // Keep false until Face ID succeeds
+          setRequiresReauth(true);
+        } else {
+          // Fresh app start or clean resume
+          setAuthToken(token);
+          setUser(JSON.parse(userData));
+          setIsAuthenticated(true);
+          console.log('✅ Mobile session restored from secure domain');
+        }
       }
     } catch (error) {
       console.log('❌ Mobile auth check error:', error);
@@ -291,17 +333,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Clear mobile secure storage
-      await AsyncStorage.multiRemove(['@gardi_auth_token', '@gardi_user_data']);
+      // Clear mobile secure storage including reauth flag
+      await AsyncStorage.multiRemove([
+        '@gardi_auth_token', 
+        '@gardi_user_data',
+        '@gardi_requires_reauth'
+      ]);
       
       // Reset mobile authentication state
       setAuthToken(null);
       setUser(null);
       setIsAuthenticated(false);
+      setRequiresReauth(false);
       
       console.log('✅ Mobile user logged out successfully from secure domain');
     } catch (error) {
       console.log('❌ Mobile logout error:', error);
+    }
+  };
+
+  const restoreSession = async () => {
+    try {
+      console.log('🔓 Restoring session after biometric authentication');
+      
+      // Clear the reauth requirement
+      await AsyncStorage.setItem('@gardi_requires_reauth', 'false');
+      setRequiresReauth(false);
+      setIsAuthenticated(true);
+      
+      console.log('✅ Session restored successfully');
+    } catch (error) {
+      console.log('❌ Error restoring session:', error);
     }
   };
 
@@ -312,7 +374,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       logout, 
       loading, 
-      authToken
+      authToken,
+      requiresReauth,
+      restoreSession
     }}>
       {children}
     </AuthContext.Provider>

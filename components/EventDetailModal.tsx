@@ -1,5 +1,5 @@
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { AlertTriangle, Calendar, Clock, MapPin, Pause, Play, RotateCcw, Video as VideoIcon, X } from 'lucide-react-native';
+import { AlertTriangle, Calendar, Clock, MapPin, Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -405,36 +405,40 @@ export default function EventDetailModal({ visible, eventId, imei, onClose }: Ev
                 {/* Road-Facing Camera */}
                 {roadFacingVideo && (
                   <View style={styles.videoContainer}>
-                    <View style={styles.cameraLabel}>
-                      <VideoIcon size={16} color="#FFFFFF" strokeWidth={2} />
-                      <ThemedText style={styles.cameraLabelText}>
-                        Road-Facing Camera
-                      </ThemedText>
-                    </View>
                     <VideoView
                       player={roadPlayer}
                       style={styles.video}
-                      nativeControls={false}
+                      nativeControls={true}
                       contentFit="contain"
+                      allowsFullscreen={true}
+                      allowsPictureInPicture={false}
+                      requiresLinearPlayback={false}
                     />
+                    {(loadingVideos || !roadPlayer.duration || roadPlayer.duration === 0) && (
+                      <View style={styles.videoLoadingOverlay}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                      </View>
+                    )}
                   </View>
                 )}
 
                 {/* In-Cabin Camera */}
                 {cabinVideo && (
                   <View style={styles.videoContainer}>
-                    <View style={styles.cameraLabel}>
-                      <VideoIcon size={16} color="#FFFFFF" strokeWidth={2} />
-                      <ThemedText style={styles.cameraLabelText}>
-                        In-Cabin Camera
-                      </ThemedText>
-                    </View>
                     <VideoView
                       player={cabinPlayer}
                       style={styles.video}
-                      nativeControls={false}
+                      nativeControls={true}
                       contentFit="contain"
+                      allowsFullscreen={true}
+                      allowsPictureInPicture={false}
+                      requiresLinearPlayback={false}
                     />
+                    {(loadingVideos || !cabinPlayer.duration || cabinPlayer.duration === 0) && (
+                      <View style={styles.videoLoadingOverlay}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                      </View>
+                    )}
                   </View>
                 )}
 
@@ -453,9 +457,17 @@ export default function EventDetailModal({ visible, eventId, imei, onClose }: Ev
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={[styles.controlButton, { backgroundColor: theme.colors.primary }]}
+                      style={[
+                        styles.controlButton, 
+                        { 
+                          backgroundColor: loadingVideos || !roadPlayer || !cabinPlayer || !roadPlayer.duration || roadPlayer.duration === 0 || !cabinPlayer.duration || cabinPlayer.duration === 0
+                            ? theme.colors.textSecondary 
+                            : theme.colors.primary 
+                        }
+                      ]}
                       onPress={handlePlayPause}
                       activeOpacity={0.8}
+                      disabled={loadingVideos || !roadPlayer || !cabinPlayer || !roadPlayer.duration || roadPlayer.duration === 0 || !cabinPlayer.duration || cabinPlayer.duration === 0}
                     >
                       {isPlaying ? (
                         <>
