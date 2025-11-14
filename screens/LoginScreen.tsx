@@ -75,15 +75,15 @@ export default function LoginScreen() {
       if (enabled !== 'true') {
         // Show biometric setup option for first-time users
         setShowBiometricPrompt(true);
-        setIsLoggingIn(false);
       } else {
-        // Store credentials for biometric login
+        // Always update stored credentials on successful login when biometric is enabled
         await AsyncStorage.multiSet([
           ['@gardi_stored_email', email],
           ['@gardi_stored_password', password],
         ]);
-        setIsLoggingIn(false);
+        console.log('🔐 Updated stored credentials for biometric login');
       }
+      setIsLoggingIn(false);
     } else {
       // Display backend error to user
       console.log('❌ Login failed with error:', result.error);

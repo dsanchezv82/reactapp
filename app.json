@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Gardi",
+    "name": "Gardi Vision",
     "slug": "gardi",
     "version": "1.0.0",
     "orientation": "default",
@@ -20,9 +20,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.garditech.gardi",
+      "bundleIdentifier": "com.garditech.gardivision",
       "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to your camera to enable video monitoring and live streaming from vehicle device.",
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to receive audio from your vehicle device.",
         "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication.",
+        "NSLocationAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to access your location",
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show you on the map and provide location-based services.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show you on the map and provide location-based services.",
         "UISupportedInterfaceOrientations": [
@@ -43,7 +46,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.garditech.gardi",
+      "package": "com.garditech.gardivision",
       "screenOrientation": "default",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -77,6 +80,7 @@
         "projectId": "7296a89c-71db-4d6c-87b9-8c4b1449ceec"
       }
     },
+    "jsEngine": "jsc",
     "newArchEnabled": false
   }
 }

@@ -60,22 +60,5 @@ target 'Gardi' do
         end
       end
     end
-
-    # Fix for Hermes dSYM issue - force debug symbols generation for archiving
-    installer.pods_project.targets.each do |target|
-      if target.name == 'hermes-engine'
-        target.build_configurations.each do |config|
-          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
-          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-        end
-      end
-    end
-
-    # Ensure dSYMs are generated for Release builds
-    installer.pods_project.build_configurations.each do |config|
-      if config.name == 'Release'
-        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
-      end
-    end
   end
 end
