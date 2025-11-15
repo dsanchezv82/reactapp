@@ -208,11 +208,12 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
 
       if (data.gpsData && Array.isArray(data.gpsData) && data.gpsData.length > 0) {
         // Transform API data (lat/lon) to our format (latitude/longitude)
+        // Convert speed from meters/second to miles per hour (1 m/s = 2.23694 mph)
         const transformedData = data.gpsData.map((point: any) => ({
           latitude: point.lat,
           longitude: point.lon,
           timestamp: new Date(point.time * 1000).toISOString(),
-          speed: point.speed,
+          speed: point.speed ? point.speed * 2.23694 : undefined, // Convert m/s to mph
           heading: point.heading,
           accuracy: point.accuracy,
         }));

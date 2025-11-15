@@ -40,6 +40,7 @@ interface User {
   createdAt: string;
   familyId?: number;
   imei?: string | null;
+  surfsightToken?: string | null;
 }
 
 interface AuthContextType {
@@ -49,6 +50,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   authToken: string | null;
+  surfsightToken: string | null;
   requiresReauth: boolean;
   restoreSession: () => Promise<void>;
 }
@@ -59,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [surfsightToken, setSurfsightToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [requiresReauth, setRequiresReauth] = useState(false);
 
@@ -102,17 +105,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const requiresReauth = await AsyncStorage.getItem('@gardi_requires_reauth');
       
       if (token && userData) {
+        const parsedUser = JSON.parse(userData);
         if (requiresReauth === 'true') {
           // Session exists but requires re-authentication (Face ID)
           console.log('🔐 Session requires re-authentication');
           setAuthToken(token);
-          setUser(JSON.parse(userData));
+          setUser(parsedUser);
+          setSurfsightToken(parsedUser.surfsightToken || null);
           setIsAuthenticated(false); // Keep false until Face ID succeeds
           setRequiresReauth(true);
         } else {
           // Fresh app start or clean resume
           setAuthToken(token);
-          setUser(JSON.parse(userData));
+          setUser(parsedUser);
+          setSurfsightToken(parsedUser.surfsightToken || null);
           setIsAuthenticated(true);
           console.log('✅ Mobile session restored from secure domain');
         }
@@ -175,6 +181,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await response.json();
       console.log('📱 Login response received:', data);
+      console.log('📱 Login response keys:', Object.keys(data));
+      console.log('📱 Has surfsightToken?', 'surfsightToken' in data);
 
       if (response.ok) {
         /**
@@ -223,7 +231,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               username: data.username || decodedPayload.username || email,
               createdAt: data.createdAt || decodedPayload.createdAt || new Date().toISOString(),
               familyId: data.familyId || decodedPayload.familyId,
-              imei: data.imei || null
+              imei: data.imei || null,
+              surfsightToken: data.surfsightToken || null
             };
             
             console.log('✅ User data constructed:', userData);
@@ -252,12 +261,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           setAuthToken(token);
           setUser(userData);
+          setSurfsightToken(userData.surfsightToken || null);
           setIsAuthenticated(true);
           
           console.log('✅ Authentication successful:', userData.email);
           console.log('📱 User ID:', userData.userId);
           console.log('📱 Family ID:', userData.familyId);
           console.log('📱 IMEI:', userData.imei);
+          console.log('📱 SurfSight Token:', userData.surfsightToken ? 'Present' : 'Missing');
           
           return { success: true };
         } else {
@@ -375,6 +386,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout, 
       loading, 
       authToken,
+      surfsightToken,
       requiresReauth,
       restoreSession
     }}>

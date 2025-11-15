@@ -9,6 +9,7 @@ import LiveVideoScreen from '../components/LiveVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import { useGPS } from '../contexts/GPSContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { wakeUpDevice } from '../utils/deviceTools';
 
 // Backend API configuration for real-time map data
 const API_BASE_URL = 'https://api.garditech.com/api';
@@ -56,10 +57,12 @@ export default function LandingScreen({ navigation }: any) {
   const [wasStationary, setWasStationary] = useState<boolean>(false);
   const [showLiveVideo, setShowLiveVideo] = useState<boolean>(false);
   const [selectedCamera, setSelectedCamera] = useState<number>(1); // Default to road-facing camera
-  const [surfsightToken, setSurfsightToken] = useState<string | null>(null);
+  const [hasInitializedMap, setHasInitializedMap] = useState<boolean>(false);
+  const [liveSurfsightToken, setLiveSurfsightToken] = useState<string | null>(null);
+  const [liveFamilyId, setLiveFamilyId] = useState<string | null>(null);
   
   const { theme } = useTheme();
-  const { authToken, user } = useAuth();
+  const { authToken, user, surfsightToken } = useAuth();
   const { gpsHistory, lastGpsUpdate, refreshGpsData, isUsingCachedData, error: gpsError } = useGPS();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
@@ -234,6 +237,23 @@ export default function LandingScreen({ navigation }: any) {
     processGpsDataForMap();
   }, [gpsHistory, processGpsDataForMap]);
 
+  // Auto-center map on first GPS data load
+  useEffect(() => {
+    if (!hasInitializedMap && mapData.length > 0) {
+      const latestLocation = mapData[mapData.length - 1];
+      const newRegion = {
+        latitude: latestLocation.latitude,
+        longitude: latestLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      setMapRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 500);
+      setHasInitializedMap(true);
+      console.log('🎯 Auto-centered map on GPS location:', latestLocation.latitude, latestLocation.longitude);
+    }
+  }, [mapData, hasInitializedMap]);
+
   // Memoize stationary check to prevent recalculating on every render
   const isVehicleStationary = useMemo(() => {
     if (!mapData || mapData.length === 0) return false;
@@ -302,44 +322,16 @@ export default function LandingScreen({ navigation }: any) {
       const newRegion = {
         latitude: latestLocation.latitude,
         longitude: latestLocation.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
       };
+      setMapRegion(newRegion);
       mapRef.current?.animateToRegion(newRegion, 500);
       console.log('🎯 Recentered map on current location:', latestLocation.latitude, latestLocation.longitude);
     }
     
     // Also refresh GPS data to get latest coordinates
     await refreshGpsData();
-  };
-
-  // Fetch SurfSight token from backend
-  const fetchSurfsightToken = async (): Promise<string | null> => {
-    try {
-      if (!authToken) {
-        console.error('❌ No auth token available');
-        return null;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/auth/surfsight-token`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        console.error('❌ Failed to fetch SurfSight token:', response.status);
-        return null;
-      }
-
-      const data = await response.json();
-      return data.token;
-    } catch (error) {
-      console.error('❌ Error fetching SurfSight token:', error);
-      return null;
-    }
   };
 
   // Handle opening live video modal
@@ -353,18 +345,10 @@ export default function LandingScreen({ navigation }: any) {
       return;
     }
 
-    // Fetch SurfSight token
-    const token = await fetchSurfsightToken();
-    if (!token) {
-      Alert.alert(
-        'Authentication Error',
-        'Unable to authenticate with SurfSight. Please try logging in again.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    setSurfsightToken(token);
+    console.log('🎥 Opening live video...');
+    console.log('📱 User IMEI:', user.imei);
+    
+    // Open modal directly - LiveVideoPlayer will handle authentication
     setSelectedCamera(1); // Default to road-facing camera
     setShowLiveVideo(true);
   };
@@ -568,19 +552,59 @@ export default function LandingScreen({ navigation }: any) {
           presentationStyle="fullScreen"
           onRequestClose={() => setShowLiveVideo(false)}
         >
-          {user?.imei && surfsightToken && (
-            <LiveVideoScreen
-              imei={user.imei}
-              authToken={surfsightToken}
-              organizationId={String(user.familyId || '')}
-              cameraId={selectedCamera}
-              protocol="webrtc"
-              onClose={() => setShowLiveVideo(false)}
-              onError={(error) => {
-                console.error('Live video error:', error);
-                setShowLiveVideo(false);
-              }}
-            />
+          {user?.imei && authToken ? (
+            <View style={{ flex: 1 }}>
+              <LiveVideoScreen
+                imei={user.imei}
+                authToken={authToken}
+                cameraId={selectedCamera}
+                onClose={() => setShowLiveVideo(false)}
+                onError={(error) => {
+                  console.error('Live video error:', error);
+                  // Don't close modal - let user see error and retry
+                }}
+              />
+              
+              {/* Wake Camera Button - Bottom Center */}
+              <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', zIndex: 1000 }}>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (user?.imei && authToken) {
+                      const result = await wakeUpDevice(user.imei, authToken);
+                      Alert.alert(
+                        result.success ? 'Success' : 'Error',
+                        result.message,
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#FF9500',
+                    paddingHorizontal: 24,
+                    paddingVertical: 12,
+                    borderRadius: 25,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                    elevation: 5,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>⏰ Wake Camera</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.text, marginTop: 16 }}>Loading video player...</Text>
+              <TouchableOpacity 
+                onPress={() => setShowLiveVideo(false)}
+                style={{ marginTop: 24, padding: 12, backgroundColor: theme.colors.surface, borderRadius: 8 }}
+              >
+                <Text style={{ color: theme.colors.text }}>Close</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </Modal>
       </View>

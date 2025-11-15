@@ -117,7 +117,7 @@ function AppNavigator() {
     <NavigationContainer>
       {isAuthenticated ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Home" component={MainTabNavigator} />
+          <Stack.Screen name="Main" component={MainTabNavigator} />
           <Stack.Screen 
             name="LiveStream" 
             component={LiveScreen}
@@ -131,7 +131,7 @@ function AppNavigator() {
               headerTintColor: theme.colors.text,
               headerLeft: () => (
                 <TouchableOpacity 
-                  onPress={() => navigation.navigate('Home')}
+                  onPress={() => navigation.goBack()}
                   style={{ marginLeft: 15, padding: 5 }}
                 >
                   <ChevronLeft size={28} color={theme.colors.text} strokeWidth={2} />
