@@ -115,17 +115,24 @@ export default function LandingScreen({ navigation }: any) {
       const { latitude, longitude } = location.coords;
       setCurrentLocation({ latitude, longitude });
       
-      // Update map region to center on user's location
-      const newRegion = {
-        latitude,
-        longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      };
-      setMapRegion(newRegion);
+      // Only center on user's location if we don't have any device GPS data (live or cached)
+      // This prevents overriding the device's position when the app updates
+      const hasDeviceGpsData = gpsHistory && gpsHistory.length > 0;
+      
+      if (!hasDeviceGpsData) {
+        const newRegion = {
+          latitude,
+          longitude,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        };
+        setMapRegion(newRegion);
+        console.log('🗺️ No GPS data (live or cached) - centered on user location:', newRegion);
+      } else {
+        console.log(`📍 User location obtained but keeping map centered on device GPS data (${isUsingCachedData ? 'cached' : 'live'})`);
+      }
       
       console.log('📍 Current location:', latitude, longitude);
-      console.log('🗺️ Updated map region to:', newRegion);
 
       setLoading(false);
       return true;
