@@ -102,7 +102,7 @@ export default function LiveVideoPlayer({
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #000000;
+      background-color: #1C1C1E;
     }
     #video-container {
       width: 100%;
@@ -117,10 +117,35 @@ export default function LiveVideoPlayer({
       position: relative;
       border-radius: 8px;
       overflow: hidden;
+      background-color: #2C2C2E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .camera-placeholder {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #8E8E93;
+      font-size: 16px;
+      z-index: 1;
+    }
+    .camera-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
     }
     lytx-live-video {
       width: 100%;
       height: 100%;
+      position: relative;
+      z-index: 2;
     }
     .camera-label {
       position: absolute;
@@ -142,6 +167,10 @@ export default function LiveVideoPlayer({
   <div id="video-container">
     <!-- Road-Facing Camera -->
     <div class="camera-view">
+      <div class="camera-placeholder">
+        <div class="camera-icon">🚗</div>
+        <div>Road Camera</div>
+      </div>
       <div class="camera-label">🚗 Road</div>
       <lytx-live-video
         auth-token="${info.surfsightJwt}"
@@ -159,6 +188,10 @@ export default function LiveVideoPlayer({
     
     <!-- In-Cabin Camera -->
     <div class="camera-view">
+      <div class="camera-placeholder">
+        <div class="camera-icon">👤</div>
+        <div>In-Cabin Camera</div>
+      </div>
       <div class="camera-label">👤 In-Cabin</div>
       <lytx-live-video
         auth-token="${info.surfsightJwt}"
@@ -347,7 +380,7 @@ export default function LiveVideoPlayer({
           
           setError(userMessage);
           setLoading(false);
-          setStreamInfo(null); // Clear stream info on error
+          // Don't clear streamInfo - keep WebView rendered to show placeholders
           onError?.(userMessage);
           break;
 
@@ -368,46 +401,22 @@ export default function LiveVideoPlayer({
         <ThemedText style={styles.closeButtonText}>✕ Close</ThemedText>
       </TouchableOpacity>
 
-      {loading && !streamInfo && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <ThemedText style={styles.loadingText}>Preparing live video...</ThemedText>
-        </View>
-      )}
-      
-      {error && (
-        <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorTitle}>⚠️ Camera Unavailable</ThemedText>
-          <ThemedText style={styles.errorText}>{error}</ThemedText>
-          
-          {/* Retry Button */}
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => {
-              setError(null);
-              setLoading(true);
-              setStreamInfo(null);
-              // Re-fetch to retry
-              fetch(`${API_BASE_URL}/devices/${imei}/live-stream-info`, {
-                headers: { 'Authorization': `Bearer ${authToken}` }
-              })
-                .then(res => res.json())
-                .then(data => {
-                  setStreamInfo(data.lytxLiveVideoProps);
-                  setLoading(false);
-                })
-                .catch(err => {
-                  setError('Failed to reconnect. Please try again.');
-                  setLoading(false);
-                });
-            }}
-          >
-            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
-          </TouchableOpacity>
+      {/* Fallback placeholder views - always show behind WebView */}
+      {streamInfo && (
+        <View style={styles.placeholderContainer}>
+          <View style={styles.placeholderView}>
+            <ThemedText style={styles.placeholderIcon}>🚗</ThemedText>
+            <ThemedText style={styles.placeholderText}>Road Camera</ThemedText>
+          </View>
+          <View style={styles.placeholderView}>
+            <ThemedText style={styles.placeholderIcon}>👤</ThemedText>
+            <ThemedText style={styles.placeholderText}>In-Cabin Camera</ThemedText>
+          </View>
         </View>
       )}
 
-      {streamInfo && !error && (
+      {/* WebView with transparent background */}
+      {streamInfo && (
         <WebView
           ref={webViewRef}
           source={{ html: buildLiveVideoHTML(streamInfo) }}
@@ -425,7 +434,17 @@ export default function LiveVideoPlayer({
           originWhitelist={['*']}
           cacheEnabled={true}
           cacheMode="LOAD_DEFAULT"
+          allowsBackForwardNavigationGestures={false}
+          startInLoadingState={false}
         />
+      )}
+
+      {/* Loading overlay */}
+      {loading && !streamInfo && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <ThemedText style={styles.loadingText}>Preparing live video...</ThemedText>
+        </View>
       )}
     </View>
   );
@@ -450,9 +469,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  placeholderContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'column',
+    gap: 8,
+    padding: 8,
+    zIndex: 1,
+  },
+  placeholderView: {
+    flex: 1,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+    opacity: 0.5,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#8E8E93',
+  },
   webview: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -465,37 +517,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
   },
-  errorContainer: {
-    flex: 1,
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 1000,
     padding: 20,
   },
-  errorTitle: {
-    fontSize: 20,
+  errorPopup: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 400,
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  errorPopupTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
-  errorText: {
-    fontSize: 16,
+  errorPopupText: {
+    fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    lineHeight: 20,
+    marginBottom: 20,
+    opacity: 0.9,
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginTop: 8,
+    alignSelf: 'center',
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 });
