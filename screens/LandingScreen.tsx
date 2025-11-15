@@ -2,9 +2,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { Video } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LiveVideoScreen from '../components/LiveVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import { useGPS } from '../contexts/GPSContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -53,6 +54,9 @@ export default function LandingScreen({ navigation }: any) {
     longitudeDelta: 0.0421,
   });
   const [wasStationary, setWasStationary] = useState<boolean>(false);
+  const [showLiveVideo, setShowLiveVideo] = useState<boolean>(false);
+  const [selectedCamera, setSelectedCamera] = useState<number>(1); // Default to road-facing camera
+  const [surfsightToken, setSurfsightToken] = useState<string | null>(null);
   
   const { theme } = useTheme();
   const { authToken, user } = useAuth();
@@ -309,6 +313,62 @@ export default function LandingScreen({ navigation }: any) {
     await refreshGpsData();
   };
 
+  // Fetch SurfSight token from backend
+  const fetchSurfsightToken = async (): Promise<string | null> => {
+    try {
+      if (!authToken) {
+        console.error('❌ No auth token available');
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/surfsight-token`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch SurfSight token:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.token;
+    } catch (error) {
+      console.error('❌ Error fetching SurfSight token:', error);
+      return null;
+    }
+  };
+
+  // Handle opening live video modal
+  const openLiveVideo = async () => {
+    if (!user?.imei) {
+      Alert.alert(
+        'Device Not Found',
+        'No device is associated with your account. Please contact support.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Fetch SurfSight token
+    const token = await fetchSurfsightToken();
+    if (!token) {
+      Alert.alert(
+        'Authentication Error',
+        'Unable to authenticate with SurfSight. Please try logging in again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setSurfsightToken(token);
+    setSelectedCamera(1); // Default to road-facing camera
+    setShowLiveVideo(true);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Real-Time Map - Full screen */}
@@ -444,7 +504,7 @@ export default function LandingScreen({ navigation }: any) {
               backgroundColor: '#00ACB4', // Teal for live stream
               marginBottom: 8
             }]}
-            onPress={() => navigation.navigate('LiveStream')}
+            onPress={openLiveVideo}
           >
             <Video size={20} color="#FFFFFF" strokeWidth={2} />
           </TouchableOpacity>
@@ -500,6 +560,29 @@ export default function LandingScreen({ navigation }: any) {
             </View>
           </View>
         )}
+
+        {/* Live Video Modal */}
+        <Modal
+          visible={showLiveVideo}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setShowLiveVideo(false)}
+        >
+          {user?.imei && surfsightToken && (
+            <LiveVideoScreen
+              imei={user.imei}
+              authToken={surfsightToken}
+              organizationId={String(user.familyId || '')}
+              cameraId={selectedCamera}
+              protocol="webrtc"
+              onClose={() => setShowLiveVideo(false)}
+              onError={(error) => {
+                console.error('Live video error:', error);
+                setShowLiveVideo(false);
+              }}
+            />
+          )}
+        </Modal>
       </View>
     </View>
   );
@@ -740,5 +823,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-
 

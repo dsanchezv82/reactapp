@@ -1,8 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Calendar, Camera, ChevronLeft, Home, User } from 'lucide-react-native';
-import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { Calendar, Camera, ChevronLeft, Home, Settings } from 'lucide-react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import contexts
@@ -68,16 +68,6 @@ function MainTabNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Video" 
-        component={VideoScreen}
-        options={{
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <Camera size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
-          ),
-        }}
-      />
-      <Tab.Screen 
         name="Events" 
         component={EventsScreen}
         options={{
@@ -87,11 +77,26 @@ function MainTabNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Profile" 
+        name="Video" 
+        component={VideoScreen}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ focused, color }) => (
+            <Camera size={24} color="#808080" strokeWidth={2} />
+          ),
+          tabBarButton: (props) => (
+            <View style={[props.style, { opacity: 0.5 }]} pointerEvents="none">
+              {props.children}
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Settings" 
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <User size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
+            <Settings size={24} color={color} strokeWidth={focused ? 2.5 : 2} />
           ),
         }}
       />
