@@ -20,7 +20,7 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-nat
  */
 export default function LiveVideoScreen() {
   const { user, authToken } = useAuth();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
   const [protocol, setProtocol] = useState<'webrtc' | 'hls'>('webrtc');
 
@@ -73,9 +73,7 @@ export default function LiveVideoScreen() {
         <LiveVideoPlayer
           imei={user.imei}
           authToken={authToken}
-          organizationId={String(user.familyId || '')}
           cameraId={selectedCamera}
-          protocol={protocol}
           onClose={handleCloseVideo}
           onError={handleVideoError}
         />
@@ -99,12 +97,12 @@ export default function LiveVideoScreen() {
         {/* Device Info */}
         {user?.imei && (
           <View style={[styles.deviceInfo, { 
-            backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7' 
+            backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7' 
           }]}>
-            <Ionicons 
+            <Ionicons
               name="hardware-chip-outline" 
               size={24} 
-              color={theme === 'dark' ? '#FFFFFF' : '#000000'} 
+              color={isDark ? '#FFFFFF' : '#000000'} 
             />
             <View style={styles.deviceInfoText}>
               <ThemedText style={styles.deviceLabel}>Device IMEI</ThemedText>
@@ -135,7 +133,7 @@ export default function LiveVideoScreen() {
                 { 
                   backgroundColor: protocol === 'webrtc' 
                     ? '#007AFF' 
-                    : (theme === 'dark' ? '#1C1C1E' : '#F2F2F7')
+                    : (isDark ? '#1C1C1E' : '#F2F2F7')
                 }
               ]}
               onPress={() => setProtocol('webrtc')}
@@ -154,7 +152,7 @@ export default function LiveVideoScreen() {
                 { 
                   backgroundColor: protocol === 'hls' 
                     ? '#007AFF' 
-                    : (theme === 'dark' ? '#1C1C1E' : '#F2F2F7')
+                    : (isDark ? '#1C1C1E' : '#F2F2F7')
                 }
               ]}
               onPress={() => setProtocol('hls')}
@@ -183,8 +181,8 @@ export default function LiveVideoScreen() {
             <TouchableOpacity
               key={camera.id}
               style={[styles.cameraCard, {
-                backgroundColor: theme === 'dark' ? '#1C1C1E' : '#FFFFFF',
-                borderColor: theme === 'dark' ? '#38383A' : '#E5E5EA',
+                backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                borderColor: isDark ? '#38383A' : '#E5E5EA',
               }]}
               onPress={() => handleCameraSelect(camera.id)}
               disabled={!user?.imei}
@@ -205,7 +203,7 @@ export default function LiveVideoScreen() {
               <Ionicons 
                 name="chevron-forward" 
                 size={24} 
-                color={theme === 'dark' ? '#8E8E93' : '#C7C7CC'} 
+                color={isDark ? '#8E8E93' : '#C7C7CC'} 
               />
             </TouchableOpacity>
           ))}
@@ -213,12 +211,12 @@ export default function LiveVideoScreen() {
 
         {/* Info Section */}
         <View style={[styles.infoBox, { 
-          backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7' 
+          backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7' 
         }]}>
           <Ionicons 
             name="information-circle-outline" 
             size={24} 
-            color={theme === 'dark' ? '#FFFFFF' : '#000000'} 
+            color={isDark ? '#FFFFFF' : '#000000'} 
           />
           <View style={styles.infoTextContainer}>
             <ThemedText style={styles.infoText}>

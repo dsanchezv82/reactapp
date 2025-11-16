@@ -1,0 +1,94 @@
+module.exports = {
+  expo: {
+    name: "Gardi Vision",
+    slug: "gardi",
+    version: "1.0.0",
+    orientation: "default",
+    icon: "./assets/images/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+      image: "./assets/images/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff",
+      dark: {
+        image: "./assets/images/splash-icon.png",
+        backgroundColor: "#000000"
+      }
+    },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.garditech.gardivision",
+      infoPlist: {
+        NSCameraUsageDescription: "This app needs access to your camera to enable video monitoring and live streaming from vehicle device.",
+        NSMicrophoneUsageDescription: "This app needs access to your microphone to receive audio from your vehicle device.",
+        NSFaceIDUsageDescription: "This app uses Face ID for secure authentication.",
+        NSLocationAlwaysUsageDescription: "Allow $(PRODUCT_NAME) to access your location",
+        NSLocationWhenInUseUsageDescription: "This app needs access to your location to show you on the map and provide location-based services.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "This app needs access to your location to show you on the map and provide location-based services.",
+        UISupportedInterfaceOrientations: [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
+      },
+      config: {
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/adaptive-icon.png",
+        backgroundColor: "#FFFFFF"
+      },
+      package: "com.garditech.gardivision",
+      screenOrientation: "default",
+      permissions: [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      config: {
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        }
+      }
+    },
+    web: {
+      bundler: "metro"
+    },
+    plugins: [
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/images/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#ffffff"
+        }
+      ],
+      "expo-web-browser",
+      "expo-video",
+      [
+        "expo-screen-orientation",
+        {
+          initialOrientation: "DEFAULT"
+        }
+      ]
+    ],
+    extra: {
+      eas: {
+        projectId: "7296a89c-71db-4d6c-87b9-8c4b1449ceec"
+      }
+    },
+    jsEngine: "jsc",
+    newArchEnabled: false
+  }
+};
