@@ -146,9 +146,14 @@ export default function EventsScreen() {
         const allEvents = responseData.data || [];
         const eventMetadata = responseData.metadata || {};
         
+        // Filter out accOn events - we only care about other event types
+        const filteredEvents = allEvents.filter((event: DeviceEvent) => 
+          event.eventType?.toLowerCase() !== 'accon'
+        );
+        
         // TODO: Re-enable driver filter when driver assignments are working
-        // const driverEvents = allEvents.filter((event: DeviceEvent) => event.driver === true);
-        const driverEvents = allEvents; // Show all events for now
+        // const driverEvents = filteredEvents.filter((event: DeviceEvent) => event.driver === true);
+        const driverEvents = filteredEvents; // Show all events for now
         
         // Update state based on whether this is a reset or loading more
         if (reset) {

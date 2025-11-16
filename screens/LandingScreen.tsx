@@ -9,7 +9,6 @@ import LiveVideoScreen from '../components/LiveVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import { useGPS } from '../contexts/GPSContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { wakeUpDevice } from '../utils/deviceTools';
 
 // Backend API configuration for real-time map data
 const API_BASE_URL = 'https://api.garditech.com/api';
@@ -573,6 +572,7 @@ export default function LandingScreen({ navigation }: any) {
               />
               
               {/* Wake Camera Button - Bottom Center */}
+              {/* Temporarily suppressed - may be needed later
               <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', zIndex: 1000 }}>
                 <TouchableOpacity
                   onPress={async () => {
@@ -600,6 +600,7 @@ export default function LandingScreen({ navigation }: any) {
                   <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>⏰ Wake Camera</Text>
                 </TouchableOpacity>
               </View>
+              */}
             </View>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
