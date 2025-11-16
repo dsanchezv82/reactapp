@@ -1,3 +1,4 @@
+import { registerForPushNotifications, sendDeviceTokenToBackend } from '@/utils/pushNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
@@ -269,6 +270,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('📱 Family ID:', userData.familyId);
           console.log('📱 IMEI:', userData.imei);
           console.log('📱 SurfSight Token:', userData.surfsightToken ? 'Present' : 'Missing');
+          
+          // Register for push notifications after successful login
+          try {
+            console.log('🔔 Registering for push notifications...');
+            const deviceToken = await registerForPushNotifications();
+            if (deviceToken) {
+              console.log('📲 Got device token, sending to backend...');
+              const registered = await sendDeviceTokenToBackend(deviceToken, token);
+              if (registered) {
+                console.log('✅ Push notifications registered successfully');
+              } else {
+                console.log('⚠️ Failed to register device token with backend');
+              }
+            } else {
+              console.log('⚠️ Could not get device token (simulator or permissions denied)');
+            }
+          } catch (error) {
+            console.log('⚠️ Push notification registration failed:', error);
+            // Don't fail login if push notification registration fails
+          }
           
           return { success: true };
         } else {
