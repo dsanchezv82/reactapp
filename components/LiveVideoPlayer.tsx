@@ -161,7 +161,16 @@ export default function LiveVideoPlayer({
     }
   </style>
   <!-- SurfSight Cloud-Hosted UI Components (US) -->
-  <script type="module" src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js"></script>
+  <script type="module" 
+    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js" 
+    data-stencil 
+    data-resources-url="https://ui-components.surfsight.net/latest/build/" 
+    data-stencil-namespace="cloud-ui-components">
+  </script>
+  <script nomodule 
+    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.js" 
+    data-stencil>
+  </script>
 </head>
 <body>
   <div id="video-container">
@@ -177,12 +186,7 @@ export default function LiveVideoPlayer({
         imei="${imei}"
         camera-id="1"
         organization-id="${info.familyId}"
-        protocol-settings="webrtc"
-        fullscreen="false"
-        close-player="false"
-        lens-name="false"
-        device-name="false"
-        live-label="true"
+        time-limit="false"
       ></lytx-live-video>
     </div>
     
@@ -198,12 +202,7 @@ export default function LiveVideoPlayer({
         imei="${imei}"
         camera-id="2"
         organization-id="${info.familyId}"
-        protocol-settings="webrtc"
-        fullscreen="false"
-        close-player="false"
-        lens-name="false"
-        device-name="false"
-        live-label="true"
+        time-limit="false"
       ></lytx-live-video>
     </div>
   </div>
