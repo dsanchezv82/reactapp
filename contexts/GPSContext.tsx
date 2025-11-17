@@ -40,7 +40,7 @@ interface GPSContextType {
 const GPSContext = createContext<GPSContextType | undefined>(undefined);
 
 export function GPSProvider({ children }: { children: React.ReactNode }) {
-  const { authToken, user, isAuthenticated } = useAuth();
+  const { authToken, user, isAuthenticated, logout } = useAuth();
   const [gpsHistory, setGpsHistory] = useState<GpsDataPoint[]>([]);
   const [lastGpsUpdate, setLastGpsUpdate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,12 +48,6 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   const [isUsingCachedData, setIsUsingCachedData] = useState(false);
   const [savedTrips, setSavedTrips] = useState<TripData[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Load cached GPS data on mount
-  useEffect(() => {
-    loadCachedGpsData();
-    loadSavedTrips();
-  }, []);
 
   // Helper: Calculate distance between two GPS points (Haversine formula)
   const calculateDistance = (points: GpsDataPoint[]): number => {
@@ -136,19 +130,33 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   const loadCachedGpsData = async () => {
     try {
       const cached = await AsyncStorage.getItem(GPS_CACHE_KEY);
+      console.log('📦 [GPSContext] Attempting to load cached GPS data...');
+      console.log('  - Cache key:', GPS_CACHE_KEY);
+      console.log('  - Cached data exists:', !!cached);
+      
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
-        // Only use cached data if it's less than 24 hours old
+        console.log('  - Cached data points:', data?.length || 0);
+        console.log('  - Cache timestamp:', timestamp);
+        
+        // Only use cached data if it's less than 7 days old (extended to preserve last known location)
         const cacheAge = Date.now() - new Date(timestamp).getTime();
-        if (cacheAge < 24 * 60 * 60 * 1000) {
-          console.log('📦 [GPSContext] Loaded cached GPS data:', data.length, 'points');
+        const cacheAgeHours = (cacheAge / (1000 * 60 * 60)).toFixed(1);
+        const cacheAgeDays = (cacheAge / (1000 * 60 * 60 * 24)).toFixed(1);
+        console.log(`  - Cache age: ${cacheAgeHours} hours (${cacheAgeDays} days)`);
+        
+        if (cacheAge < 7 * 24 * 60 * 60 * 1000) {
+          console.log('✅ [GPSContext] Loaded cached GPS data:', data.length, 'points');
+          console.log('📍 [GPSContext] Latest cached point:', data[data.length - 1]);
           setGpsHistory(data);
           setLastGpsUpdate(new Date(timestamp));
           setIsUsingCachedData(true);
         } else {
-          console.log('🗑️ [GPSContext] Cached GPS data too old, clearing...');
+          console.log('🗑️ [GPSContext] Cached GPS data too old (>7 days), clearing...');
           await AsyncStorage.removeItem(GPS_CACHE_KEY);
         }
+      } else {
+        console.log('ℹ️ [GPSContext] No cached GPS data found');
       }
     } catch (err) {
       console.error('❌ [GPSContext] Error loading cached GPS data:', err);
@@ -167,10 +175,62 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Helper: Check if JWT token is expired
+  const isTokenExpired = (token: string): boolean => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.log('⚠️ [GPSContext] Invalid JWT format (not 3 parts)');
+        return true;
+      }
+      
+      const base64Payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const paddedPayload = base64Payload.padEnd(
+        base64Payload.length + (4 - (base64Payload.length % 4)) % 4,
+        '='
+      );
+      const decodedPayload = JSON.parse(atob(paddedPayload));
+      
+      if (!decodedPayload.exp) {
+        console.log('⚠️ [GPSContext] JWT has no expiration (exp claim missing)');
+        return false; // If no exp, assume valid
+      }
+      
+      const expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      const isExpired = currentTime > expirationTime;
+      
+      if (isExpired) {
+        const expiredMs = currentTime - expirationTime;
+        console.log(`⏰ [GPSContext] JWT expired ${Math.round(expiredMs / 1000)} seconds ago`);
+      } else {
+        const validForMs = expirationTime - currentTime;
+        console.log(`✓ [GPSContext] JWT valid for ${Math.round(validForMs / 1000)} more seconds`);
+      }
+      
+      return isExpired;
+    } catch (err) {
+      console.error('❌ [GPSContext] Error checking JWT expiration:', err);
+      return false; // Assume valid on error
+    }
+  };
+
   // Fetch GPS data from backend
   const fetchGpsData = async (isBackgroundRefresh: boolean = false) => {
     if (!authToken || !user?.imei) {
       console.log('⚠️ [GPSContext] Cannot fetch GPS data: missing auth or IMEI');
+      console.log('  - authToken exists:', !!authToken, 'length:', authToken?.length || 0);
+      console.log('  - user.imei:', user?.imei || 'missing');
+      return;
+    }
+
+    // Check token expiration before making API call
+    if (isTokenExpired(authToken)) {
+      console.log('⛔ [GPSContext] JWT token is expired - logging out user');
+      setError('Authentication token expired. Logging out...');
+      
+      // Automatically logout user
+      await logout();
       return;
     }
     
@@ -180,6 +240,7 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
       }
       setError(null);
       console.log('🌍 [GPSContext] Fetching GPS data for IMEI:', user.imei);
+      console.log('📋 [GPSContext] Auth token preview:', authToken.substring(0, 20) + '...');
       
       // Get GPS data for the last 24 hours
       const endDate = new Date();
@@ -200,6 +261,18 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!response.ok) {
+        // Log response body for debugging
+        const responseText = await response.text();
+        console.log(`❌ [GPSContext] GPS API error response (${response.status}):`, responseText.substring(0, 200));
+        
+        // If 401 Unauthorized, token is invalid - logout user
+        if (response.status === 401) {
+          console.log('🔒 [GPSContext] 401 Unauthorized - logging out user');
+          setError('Authentication failed. Logging out...');
+          await logout();
+          return;
+        }
+        
         throw new Error(`GPS API error: ${response.status} ${response.statusText}`);
       }
 
@@ -302,10 +375,9 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
         await saveCachedGpsData(currentTrip);
       } else {
         console.log('ℹ️ [GPSContext] No GPS data available for this time range');
-        // If no fresh data but we have cached data, keep showing it
-        if (gpsHistory.length === 0) {
-          await loadCachedGpsData();
-        }
+        // If no fresh data, always try to load cached data as fallback (last known location)
+        console.log('📦 [GPSContext] No live data - loading cached data as fallback...');
+        await loadCachedGpsData();
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load GPS data';
@@ -329,6 +401,12 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   const refreshGpsData = async () => {
     await fetchGpsData(false);
   };
+
+  // Load cached GPS data on mount and when user logs in
+  useEffect(() => {
+    loadCachedGpsData();
+    loadSavedTrips();
+  }, [isAuthenticated, user?.imei]);
 
   // Start GPS tracking when authenticated
   useEffect(() => {
