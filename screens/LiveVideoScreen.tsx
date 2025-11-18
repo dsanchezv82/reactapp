@@ -26,8 +26,8 @@ export default function LiveVideoScreen() {
 
   // Camera options
   const cameras = [
-    { id: 1, name: 'Road-Facing Camera', icon: 'car-outline' },
-    { id: 2, name: 'In-Cab Camera', icon: 'person-outline' },
+    { id: 1, name: 'Road-Facing Camera' },
+    { id: 2, name: 'In-Cab Camera' },
   ];
 
   const handleCameraSelect = (cameraId: number) => {
@@ -187,13 +187,6 @@ export default function LiveVideoScreen() {
               onPress={() => handleCameraSelect(camera.id)}
               disabled={!user?.imei}
             >
-              <View style={styles.cameraCardIcon}>
-                <Ionicons 
-                  name={camera.icon as any} 
-                  size={32} 
-                  color="#007AFF" 
-                />
-              </View>
               <View style={styles.cameraCardContent}>
                 <ThemedText style={styles.cameraName}>{camera.name}</ThemedText>
                 <ThemedText style={styles.cameraDescription}>
@@ -328,15 +321,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
-  },
-  cameraCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#007AFF20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
   },
   cameraCardContent: {
     flex: 1,

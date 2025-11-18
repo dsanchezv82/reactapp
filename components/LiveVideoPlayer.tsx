@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import RNFS from 'react-native-fs';
+import StaticServer from 'react-native-static-server';
+import { WebView } from 'react-native-webview';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemedText from './ThemedText';
-import { WebView } from 'react-native-webview';
-import StaticServer from 'react-native-static-server';
-import RNFS from 'react-native-fs';
 
 const API_BASE_URL = 'https://api.garditech.com/api';
 
@@ -154,10 +154,9 @@ export default function LiveVideoPlayer({
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background-color: #1C1C1E; }
-    #video-container { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
-    .camera-view { flex: 1; position: relative; border-radius: 8px; overflow: hidden; background-color: #2C2C2E; display: flex; align-items: center; justify-content: center; }
+    #video-container { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 8px; }
+    .camera-view { height: 25%; position: relative; border-radius: 8px; overflow: hidden; background-color: #2C2C2E; display: flex; align-items: center; justify-content: center; }
     lytx-live-video { width: 100%; height: 100%; position: relative; z-index: 2; }
-    .camera-label { position: absolute; top: 8px; left: 8px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600; z-index: 10; }
   </style>
   <script type="module" src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js" data-stencil data-resources-url="https://ui-components.surfsight.net/latest/build/" data-stencil-namespace="cloud-ui-components"></script>
   <script nomodule src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.js" data-stencil></script>
@@ -165,11 +164,9 @@ export default function LiveVideoPlayer({
 <body>
   <div id="video-container">
     <div class="camera-view">
-      <div class="camera-label">🚗 Road</div>
       <lytx-live-video id="camera-road" camera-id="1" time-limit="false"></lytx-live-video>
     </div>
     <div class="camera-view">
-      <div class="camera-label">👤 In-Cabin</div>
       <lytx-live-video id="camera-cabin" camera-id="2" time-limit="false"></lytx-live-video>
     </div>
   </div>

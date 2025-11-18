@@ -1,8 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Calendar, Camera, ChevronLeft, Home, Settings } from 'lucide-react-native';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Calendar, Camera, Home, Settings } from 'lucide-react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import contexts
