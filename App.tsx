@@ -17,7 +17,6 @@ import ThemedView from './components/ThemedView';
 // Import screens
 import EventsScreen from './screens/EventsScreen';
 import LandingScreen from './screens/LandingScreen';
-import LiveScreen from './screens/LiveScreen';
 import LoginScreen from './screens/LoginScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import VideoScreen from './screens/VideoScreen';
@@ -118,27 +117,6 @@ function AppNavigator() {
       {isAuthenticated ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Main" component={MainTabNavigator} />
-          <Stack.Screen 
-            name="LiveStream" 
-            component={LiveScreen}
-            options={({ navigation }) => ({
-              headerShown: true,
-              title: 'Live Stream',
-              presentation: 'card',
-              headerStyle: {
-                backgroundColor: theme.colors.surface,
-              },
-              headerTintColor: theme.colors.text,
-              headerLeft: () => (
-                <TouchableOpacity 
-                  onPress={() => navigation.goBack()}
-                  style={{ marginLeft: 15, padding: 5 }}
-                >
-                  <ChevronLeft size={28} color={theme.colors.text} strokeWidth={2} />
-                </TouchableOpacity>
-              ),
-            })}
-          />
         </Stack.Navigator>
       ) : (
         <LoginScreen />

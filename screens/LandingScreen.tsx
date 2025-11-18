@@ -9,6 +9,7 @@ import LiveVideoScreen from '../components/LiveVideoPlayer';
 import { useAuth } from '../contexts/AuthContext';
 import { useGPS } from '../contexts/GPSContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { getStationaryReason, isVehicleStationary } from '../utils/vehicleStatus';
 
 // Backend API configuration for real-time map data
 const API_BASE_URL = 'https://api.garditech.com/api';
@@ -260,49 +261,38 @@ export default function LandingScreen({ navigation }: any) {
     }
   }, [mapData, hasInitializedMap]);
 
-  // Memoize stationary check to prevent recalculating on every render
-  const isVehicleStationary = useMemo(() => {
-    if (!mapData || mapData.length === 0) return false;
+  // Memoize stationary check using shared utility
+  const isVehicleStationaryNow = useMemo(() => {
+    const stationary = isVehicleStationary(mapData);
     
-    const latestPoint = mapData[mapData.length - 1];
-    const hasZeroSpeed = !latestPoint.speed || latestPoint.speed < 3;
-    
-    const latestTimestamp = new Date(latestPoint.timestamp).getTime();
-    const currentTime = new Date().getTime();
-    const timeDifferenceMinutes = (currentTime - latestTimestamp) / (1000 * 60);
-    const isDataStale = timeDifferenceMinutes >= 5;
-    
-    let isDeviceOnStandby = false;
-    if (mapData.length >= 2) {
-      const previousPoint = mapData[mapData.length - 2];
-      isDeviceOnStandby = 
-        latestPoint.latitude === previousPoint.latitude &&
-        latestPoint.longitude === previousPoint.longitude &&
-        latestPoint.speed === previousPoint.speed &&
-        latestPoint.timestamp === previousPoint.timestamp;
+    // Debug logging
+    if (mapData.length > 0) {
+      const latestPoint = mapData[mapData.length - 1];
+      const oldestPoint = mapData[0];
+      const latestSpeed = latestPoint.speed || 0;
+      const dataSpanMinutes = (new Date(latestPoint.timestamp).getTime() - new Date(oldestPoint.timestamp).getTime()) / (60 * 1000);
+      
+      console.log(`📊 Stationary check: speed=${latestSpeed.toFixed(1)}mph, dataSpan=${dataSpanMinutes.toFixed(1)}min, points=${mapData.length}, stationary=${stationary}`);
     }
-    
-    const isStationary = (hasZeroSpeed && isDataStale) || (isDeviceOnStandby && isDataStale);
     
     // Log stationary status (but only when it changes)
-    if (isStationary) {
-      const reason = isDeviceOnStandby ? 'device on standby' : 'speed: 0';
-      const minutes = timeDifferenceMinutes.toFixed(1);
-      console.log(`🅿️ Vehicle stationary - hiding trail (${reason} for ${minutes} minutes)`);
+    if (stationary) {
+      const reason = getStationaryReason(mapData);
+      console.log(`🅿️ Vehicle stationary - hiding trail (${reason})`);
     }
     
-    return isStationary;
+    return stationary;
   }, [mapData]);
 
   // Log only when stationary state changes
   useEffect(() => {
-    if (isVehicleStationary !== wasStationary) {
-      setWasStationary(isVehicleStationary);
-      if (!isVehicleStationary && wasStationary) {
+    if (isVehicleStationaryNow !== wasStationary) {
+      setWasStationary(isVehicleStationaryNow);
+      if (!isVehicleStationaryNow && wasStationary) {
         console.log('🚗 Vehicle is now moving - showing trail');
       }
     }
-  }, [isVehicleStationary, wasStationary]);
+  }, [isVehicleStationaryNow, wasStationary]);
 
   // Zoom functions
   const zoomIn = () => {
@@ -380,7 +370,7 @@ export default function LandingScreen({ navigation }: any) {
           rotateEnabled={true}
         >
           {/* Dotted line connecting GPS points - only show if car is moving, color by speed */}
-          {!loading && mapData.length > 1 && !isVehicleStationary && (() => {
+          {!loading && mapData.length > 1 && !isVehicleStationaryNow && (() => {
             // Function to get color based on speed (in mph)
             const getSpeedColor = (speed?: number): string => {
               if (!speed || speed < 0) return '#87CEEB'; // Light blue for 0-20 mph (default)

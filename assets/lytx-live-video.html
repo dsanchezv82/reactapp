@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base href="https://api-prod.surfsight.net/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Feature-Policy" content="camera 'self'; microphone 'self'; display-capture 'self'">
+  <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*, display-capture=*">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1C1C1E;
+    }
+    #video-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+    }
+    .camera-view {
+      flex: 1;
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: #2C2C2E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    lytx-live-video {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      z-index: 2;
+    }
+    .camera-label {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 10;
+    }
+  </style>
+  
+  <!-- SurfSight Cloud-Hosted UI Components (US) -->
+  <script type="module" 
+    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js" 
+    data-stencil 
+    data-resources-url="https://ui-components.surfsight.net/latest/build/" 
+    data-stencil-namespace="cloud-ui-components">
+  </script>
+  <script nomodule 
+    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.js" 
+    data-stencil>
+  </script>
+</head>
+<body>
+  <div id="video-container">
+    <!-- Road-Facing Camera -->
+    <div class="camera-view">
+      <div class="camera-label">🚗 Road</div>
+      <lytx-live-video 
+        id="camera-road"
+        camera-id="1"
+        time-limit="false"
+      ></lytx-live-video>
+    </div>
+    
+    <!-- In-Cabin Camera -->
+    <div class="camera-view">
+      <div class="camera-label">👤 In-Cabin</div>
+      <lytx-live-video 
+        id="camera-cabin"
+        camera-id="2"
+        time-limit="false"
+      ></lytx-live-video>
+    </div>
+  </div>
+
+  <script>
+    console.log('🌐 Page loaded with origin:', window.location.origin);
+    console.log('🌐 Origin is null?', window.location.origin === 'null');
+    
+    // Wait for message from React Native with credentials
+    window.addEventListener('message', function(event) {
+      console.log('📨 Received message from React Native:', event.data);
+      
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        if (data.type === 'INIT_LIVE_VIDEO') {
+          console.log('🎬 Initializing live video with credentials');
+          console.log('   IMEI:', data.imei);
+          console.log('   FamilyID:', data.familyId);
+          console.log('   Has JWT:', !!data.authToken);
+          
+          // Wait for web components to be defined
+          if (customElements.get('lytx-live-video')) {
+            initializeCameras(data);
+          } else {
+            customElements.whenDefined('lytx-live-video').then(() => {
+              initializeCameras(data);
+            });
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to parse message:', err);
+      }
+    });
+    
+    function initializeCameras(data) {
+      console.log('✅ lytx-live-video component defined, initializing...');
+      
+      const roadCamera = document.getElementById('camera-road');
+      const cabinCamera = document.getElementById('camera-cabin');
+      
+      if (roadCamera && cabinCamera) {
+        // Set properties via JavaScript (matching Storybook)
+        roadCamera.authToken = data.authToken;
+        roadCamera.imei = data.imei;
+        roadCamera.cameraId = '1';
+        roadCamera.organizationId = data.familyId;
+        roadCamera.timeLimit = false;
+        
+        cabinCamera.authToken = data.authToken;
+        cabinCamera.imei = data.imei;
+        cabinCamera.cameraId = '2';
+        cabinCamera.organizationId = data.familyId;
+        cabinCamera.timeLimit = false;
+        
+        console.log('✅ All properties set via JavaScript');
+        console.log('✅ Origin check should pass:', window.location.origin !== 'null');
+        
+        // Send confirmation back to React Native
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'CAMERAS_INITIALIZED',
+            origin: window.location.origin
+          }));
+        }
+      } else {
+        console.error('❌ Camera elements not found');
+      }
+    }
+    
+    // Bridge console to React Native
+    if (window.ReactNativeWebView) {
+      const originalLog = console.log;
+      const originalError = console.error;
+      
+      console.log = function() {
+        originalLog.apply(console, arguments);
+        const args = Array.prototype.slice.call(arguments);
+        const message = args.map(a => {
+          if (typeof a === 'object' && a !== null) {
+            try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+          }
+          return String(a);
+        }).join(' ');
+        
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'console_log',
+          data: message
+        }));
+      };
+      
+      console.error = function() {
+        originalError.apply(console, arguments);
+        const args = Array.prototype.slice.call(arguments);
+        const message = args.map(a => {
+          if (typeof a === 'object' && a !== null) {
+            try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+          }
+          return String(a);
+        }).join(' ');
+        
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'console_error',
+          data: message
+        }));
+      };
+    }
+  </script>
+</body>
+</html>

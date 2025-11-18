@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { STATIONARY_THRESHOLD_MS } from '../utils/vehicleStatus';
 import { useAuth } from './AuthContext';
 
 const API_BASE_URL = 'https://api.garditech.com/api';
@@ -300,7 +301,7 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
         // indicating the vehicle was stationary (e.g., stopped at a location)
         const currentTripData = [];
         let previousTimestamp = null;
-        const TRIP_GAP_THRESHOLD = 20 * 60 * 1000; // 20 minutes gap = new trip
+        const TRIP_GAP_THRESHOLD = STATIONARY_THRESHOLD_MS; // 20 minutes gap = new trip
         
         for (const point of sortedData) {
           const currentTime = new Date(point.timestamp).getTime();

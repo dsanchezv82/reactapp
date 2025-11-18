@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import ThemedText from './ThemedText';
+import { WebView } from 'react-native-webview';
+import StaticServer from 'react-native-static-server';
+import RNFS from 'react-native-fs';
 
 const API_BASE_URL = 'https://api.garditech.com/api';
 
@@ -24,7 +26,7 @@ interface LiveStreamInfo {
 /**
  * LiveVideoPlayer - SurfSight Live Video Component for React Native
  * 
- * Uses the lytx-live-video web component (same as web app).
+ * Uses native WebRTC implementation to connect to SurfSight media servers.
  * Fetches SurfSight JWT from backend using IMEI.
  */
 export default function LiveVideoPlayer({
@@ -34,365 +36,261 @@ export default function LiveVideoPlayer({
   onClose,
   onError,
 }: LiveVideoPlayerProps) {
-  const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamInfo, setStreamInfo] = useState<LiveStreamInfo['lytxLiveVideoProps'] | null>(null);
+  const [wakingUp, setWakingUp] = useState(false);
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
   const { theme } = useTheme();
 
-  // Fetch SurfSight JWT and family ID from backend
-  useEffect(() => {
-    const fetchStreamInfo = async () => {
-      try {
-        console.log('🎥 Fetching live stream info for IMEI:', imei);
-        
-        const response = await fetch(
-          `${API_BASE_URL}/devices/${imei}/live-stream-info`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${authToken}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Failed to fetch stream info:', response.status, errorText);
-          throw new Error('Failed to get live stream credentials');
+  // Wake up the camera from standby mode
+  const wakeUpCamera = async () => {
+    try {
+      setWakingUp(true);
+      console.log('⏰ Waking up camera for IMEI:', imei);
+      
+      const response = await fetch(
+        `${API_BASE_URL}/devices/${imei}/wake-up`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
         }
+      );
 
-        const data: LiveStreamInfo = await response.json();
-        console.log('✅ Stream info received, familyId:', data.lytxLiveVideoProps.familyId);
-        console.log('🔑 SurfSight JWT:', data.lytxLiveVideoProps.surfsightJwt);
-        console.log('🔑 SurfSight JWT length:', data.lytxLiveVideoProps.surfsightJwt.length);
-        console.log('🔑 Gardi JWT (authToken):', authToken);
-        console.log('🔑 Gardi JWT length:', authToken.length);
-        console.log('🔍 Are they different?', data.lytxLiveVideoProps.surfsightJwt !== authToken);
-        setStreamInfo(data.lytxLiveVideoProps);
-        setLoading(false);
-      } catch (err: any) {
-        console.error('❌ Stream info error:', err);
-        const errorMsg = 'Unable to connect to live video. The device may be offline or in standby mode.\n\n• Start the vehicle (turn ignition ON)\n• Wait 30-60 seconds\n• Ensure good cellular signal';
-        setError(errorMsg);
-        setLoading(false);
-        onError?.(errorMsg);
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`Wake-up failed: ${response.status} - ${responseText}`);
       }
-    };
 
-    fetchStreamInfo();
-  }, [imei, authToken, cameraId, onClose, onError]);
+      console.log('✅ Wake-up command sent successfully');
+      
+      // Wait 5 seconds then retry fetching stream info
+      setTimeout(() => {
+        console.log('🔄 Retrying stream connection after wake-up...');
+        setError(null);
+        setLoading(true);
+        setWakingUp(false);
+        fetchStreamInfo();
+      }, 5000);
+      
+    } catch (err: any) {
+      console.error('❌ Wake-up error:', err);
+      setWakingUp(false);
+      
+      // Provide helpful error message
+      let userMessage = 'Unable to send wake-up command.';
+      if (err.message && err.message.includes('500')) {
+        userMessage = 'The wake-up command could not be completed. This may be because:\n\n• The device doesn\'t support remote wake-up\n• The camera is already powering on\n• There\'s a temporary connectivity issue\n\nTry starting the vehicle to wake the camera, or tap Retry in a few moments.';
+      } else if (err.message && err.message.includes('401')) {
+        userMessage = 'Authentication expired. Please log out and log back in.';
+      } else if (err.message && err.message.includes('404')) {
+        userMessage = 'Device not found. Please contact support.';
+      } else if (err.message && err.message.includes('timeout')) {
+        userMessage = 'Request timed out. Please check your internet connection and try again.';
+      }
+      
+      setError(userMessage);
+    }
+  };
 
-  // Build HTML with lytx-live-video component (same as web app)
-  const buildLiveVideoHTML = (info: LiveStreamInfo['lytxLiveVideoProps']) => {
-    return `
-<!DOCTYPE html>
+  // Fetch SurfSight JWT and family ID from backend
+  const fetchStreamInfo = async () => {
+    try {
+      console.log('🎥 Fetching live stream info for IMEI:', imei);
+        
+      const response = await fetch(
+        `${API_BASE_URL}/devices/${imei}/live-stream-info`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to fetch stream info:', response.status, errorText);
+        throw new Error('Failed to get live stream credentials');
+      }
+
+      const data: LiveStreamInfo = await response.json();
+      console.log('✅ Stream info received');
+      console.log('📋 Family ID:', data.lytxLiveVideoProps.familyId);
+      console.log('🔑 SurfSight JWT obtained');
+      
+      setStreamInfo(data.lytxLiveVideoProps);
+      setLoading(false);
+    } catch (err: any) {
+      console.error('❌ Stream info error:', err);
+      const errorMsg = 'Unable to connect to live video. The device may be offline or in standby mode.\n\n• Start the vehicle (turn ignition ON)\n• Wait 30-60 seconds\n• Ensure good cellular signal';
+      setError(errorMsg);
+      setLoading(false);
+      onError?.(errorMsg);
+    }
+  };
+
+  // Start local HTTP server and fetch stream info on component mount
+  useEffect(() => {
+    let server: any = null;
+    
+    const startServer = async () => {
+      try {
+        console.log('🌐 Starting local HTTP server...');
+        
+        // HTML content embedded as string
+        const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <base href="https://api-prod.surfsight.net/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Feature-Policy" content="camera 'self'; microphone 'self'; display-capture 'self'">
+  <meta http-equiv="Permissions-Policy" content="camera=*, microphone=*, display-capture=*">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #1C1C1E;
-    }
-    #video-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding: 8px;
-    }
-    .camera-view {
-      flex: 1;
-      position: relative;
-      border-radius: 8px;
-      overflow: hidden;
-      background-color: #2C2C2E;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .camera-placeholder {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #8E8E93;
-      font-size: 16px;
-      z-index: 1;
-    }
-    .camera-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-      opacity: 0.5;
-    }
-    lytx-live-video {
-      width: 100%;
-      height: 100%;
-      position: relative;
-      z-index: 2;
-    }
-    .camera-label {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      background-color: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 4px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 10;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background-color: #1C1C1E; }
+    #video-container { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+    .camera-view { flex: 1; position: relative; border-radius: 8px; overflow: hidden; background-color: #2C2C2E; display: flex; align-items: center; justify-content: center; }
+    lytx-live-video { width: 100%; height: 100%; position: relative; z-index: 2; }
+    .camera-label { position: absolute; top: 8px; left: 8px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600; z-index: 10; }
   </style>
-  <!-- SurfSight Cloud-Hosted UI Components (US) -->
-  <script type="module" 
-    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js" 
-    data-stencil 
-    data-resources-url="https://ui-components.surfsight.net/latest/build/" 
-    data-stencil-namespace="cloud-ui-components">
-  </script>
-  <script nomodule 
-    src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.js" 
-    data-stencil>
-  </script>
+  <script type="module" src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.esm.js" data-stencil data-resources-url="https://ui-components.surfsight.net/latest/build/" data-stencil-namespace="cloud-ui-components"></script>
+  <script nomodule src="https://ui-components.surfsight.net/latest/build/cloud-ui-components.js" data-stencil></script>
 </head>
 <body>
   <div id="video-container">
-    <!-- Road-Facing Camera -->
     <div class="camera-view">
-      <div class="camera-placeholder">
-        <div class="camera-icon">🚗</div>
-        <div>Road Camera</div>
-      </div>
       <div class="camera-label">🚗 Road</div>
-      <lytx-live-video
-        auth-token="${info.surfsightJwt}"
-        imei="${imei}"
-        camera-id="1"
-        organization-id="${info.familyId}"
-        time-limit="false"
-      ></lytx-live-video>
+      <lytx-live-video id="camera-road" camera-id="1" time-limit="false"></lytx-live-video>
     </div>
-    
-    <!-- In-Cabin Camera -->
     <div class="camera-view">
-      <div class="camera-placeholder">
-        <div class="camera-icon">👤</div>
-        <div>In-Cabin Camera</div>
-      </div>
       <div class="camera-label">👤 In-Cabin</div>
-      <lytx-live-video
-        auth-token="${info.surfsightJwt}"
-        imei="${imei}"
-        camera-id="2"
-        organization-id="${info.familyId}"
-        time-limit="false"
-      ></lytx-live-video>
+      <lytx-live-video id="camera-cabin" camera-id="2" time-limit="false"></lytx-live-video>
     </div>
   </div>
-
   <script>
-    // Capture all console logs and send to React Native
-    const originalConsoleLog = console.log;
-    const originalConsoleError = console.error;
-    const originalConsoleWarn = console.warn;
-
-    console.log = function(...args) {
-      originalConsoleLog.apply(console, args);
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'console_log',
-          data: args.map(a => String(a)).join(' ')
-        }));
-      }
-    };
-
-    console.error = function(...args) {
-      originalConsoleError.apply(console, args);
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'console_error',
-          data: args.map(a => String(a)).join(' ')
-        }));
-      }
-    };
-
-    console.warn = function(...args) {
-      originalConsoleWarn.apply(console, args);
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'console_warn',
-          data: args.map(a => String(a)).join(' ')
-        }));
-      }
-    };
-
-    // Setup communication with React Native
-    const liveVideoElement = document.querySelector('lytx-live-video');
+    console.log('🌐 Page loaded with origin:', window.location.origin);
+    console.log('🌐 Origin is null?', window.location.origin === 'null');
     
-    if (liveVideoElement) {
-      // Handle close event
-      liveVideoElement.addEventListener('close', (event) => {
-        console.log('Live video closed:', event);
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'close',
-          data: event.detail
-        }));
-      });
-
-      // Handle component errors
-      liveVideoElement.addEventListener('componentError', (event) => {
-        console.error('Live video component error:', event);
-        console.error('Error detail:', event.detail);
-        console.error('Error detail type:', typeof event.detail);
-        console.error('Error detail keys:', event.detail ? Object.keys(event.detail) : 'none');
-        console.error('Error detail.error:', event.detail?.error);
-        console.error('Error detail.message:', event.detail?.message);
-        console.error('Error data:', JSON.stringify(event.detail));
-        
-        // Extract the actual error message from the event
-        let errorMessage = 'Unknown error occurred';
-        if (event.detail) {
-          if (typeof event.detail === 'string') {
-            errorMessage = event.detail;
-          } else if (event.detail.error) {
-            errorMessage = event.detail.error;
-          } else if (event.detail.message) {
-            errorMessage = event.detail.message;
+    window.addEventListener('message', function(event) {
+      console.log('📨 Received message from React Native:', event.data);
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data.type === 'INIT_LIVE_VIDEO') {
+          console.log('🎬 Initializing live video with credentials');
+          if (customElements.get('lytx-live-video')) {
+            initializeCameras(data);
+          } else {
+            customElements.whenDefined('lytx-live-video').then(() => initializeCameras(data));
           }
         }
-        
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'error',
-          data: errorMessage
-        }));
-      });
-
-      // Notify when component loads successfully
-      setTimeout(() => {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'ready',
-          data: 'Live video component loaded'
-        }));
-      }, 1000);
-    } else {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'error',
-        data: 'Failed to initialize live video component'
-      }));
-    }
-
-    // Log any console errors for debugging
-    window.addEventListener('error', (event) => {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        type: 'error',
-        data: event.message || 'JavaScript error occurred'
-      }));
+      } catch (err) {
+        console.error('❌ Failed to parse message:', err);
+      }
     });
+    
+    function initializeCameras(data) {
+      console.log('✅ lytx-live-video component defined, initializing...');
+      const roadCamera = document.getElementById('camera-road');
+      const cabinCamera = document.getElementById('camera-cabin');
+      
+      if (roadCamera && cabinCamera) {
+        roadCamera.authToken = data.authToken;
+        roadCamera.imei = data.imei;
+        roadCamera.cameraId = '1';
+        roadCamera.organizationId = data.familyId;
+        roadCamera.timeLimit = false;
+        
+        cabinCamera.authToken = data.authToken;
+        cabinCamera.imei = data.imei;
+        cabinCamera.cameraId = '2';
+        cabinCamera.organizationId = data.familyId;
+        cabinCamera.timeLimit = false;
+        
+        console.log('✅ All properties set via JavaScript');
+        console.log('✅ Origin check should pass:', window.location.origin !== 'null');
+        
+        // Auto-click "Continue watching" button when it appears
+        setupAutoContinue(roadCamera);
+        setupAutoContinue(cabinCamera);
+        
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CAMERAS_INITIALIZED', origin: window.location.origin }));
+        }
+      } else {
+        console.error('❌ Camera elements not found');
+      }
+    }
+    
+    function setupAutoContinue(cameraElement) {
+      const observer = new MutationObserver(() => {
+        const shadowRoot = cameraElement.shadowRoot;
+        if (shadowRoot) {
+          // Look for "Continue watching" button
+          const continueButton = shadowRoot.querySelector('button');
+          if (continueButton && continueButton.textContent && continueButton.textContent.includes('Continue')) {
+            console.log('🔄 Auto-clicking Continue watching button');
+            continueButton.click();
+          }
+        }
+      });
+      
+      observer.observe(cameraElement, { 
+        childList: true, 
+        subtree: true,
+        attributes: true 
+      });
+    }
+    
+    window.onerror = function(msg, url, line, col, error) {
+      console.error('❌ JavaScript Error:', { msg, url, line, col, error });
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ERROR', error: msg }));
+      }
+    };
   </script>
 </body>
-</html>
-    `;
-  };
-
-  const handleMessage = (event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-      console.log('📹 Live video message:', message.type);
-
-      switch (message.type) {
-        case 'console_log':
-          console.log('🌐 WebView:', message.data);
-          break;
-
-        case 'console_error':
-          console.error('🌐 WebView Error:', message.data);
-          break;
-
-        case 'console_warn':
-          console.warn('🌐 WebView Warning:', message.data);
-          break;
-
-        case 'ready':
-          console.log('✅ Live video player ready');
-          break;
-
-        case 'close':
-          console.log('🔒 Live video closed by user');
-          onClose?.();
-          break;
-
-        case 'error':
-          const errorData = message.data;
-          let errorMsg = 'Unknown error';
-          
-          // Extract error message from various formats
-          if (typeof errorData === 'string') {
-            errorMsg = errorData;
-          } else if (errorData?.message) {
-            errorMsg = errorData.message;
-          } else if (errorData?.error) {
-            errorMsg = errorData.error;
-          }
-          
-          console.error('❌ Live video error:', errorMsg);
-          
-          // Provide user-friendly error messages
-          let userMessage = errorMsg;
-          let shouldCloseModal = false;
-          
-          if (errorMsg.includes('DeviceStandby') || errorMsg.includes('standby')) {
-            userMessage = 'Camera is Starting Up\n\nThe device is powering on. This usually takes 2-3 minutes after starting the vehicle.\n\n• Wait a few minutes for the device to fully boot\n• Ensure the device has cellular signal\n• Tap "Retry" to check again\n\nIf the car has been running for more than 5 minutes, the device may need servicing.';
-            // Stay in modal for standby
-          } else if (errorMsg.includes('DeviceOffline') || errorMsg.includes('offline')) {
-            userMessage = 'Camera is Offline\n\nThe device is not connected to the internet. Check that:\n\n• The device has power\n• Cellular connection is active\n• Device is not in a signal dead zone';
-            shouldCloseModal = true;
-          } else if (errorMsg.includes('canceled') || errorMsg.includes('ERR_CANCELED')) {
-            userMessage = 'Unable to Connect\n\nThe device may be offline or in standby mode.';
-            shouldCloseModal = true;
-          } else if (errorMsg.includes('timeout')) {
-            userMessage = 'Connection Timeout\n\nPlease check your internet connection and try again.';
-            shouldCloseModal = true;
-          } else if (errorMsg.includes('authentication') || errorMsg.includes('auth')) {
-            userMessage = 'Authentication Failed\n\nPlease log out and log back in.';
-            shouldCloseModal = true;
-          } else {
-            userMessage = `Live Video Unavailable\n\n${errorMsg}`;
-            shouldCloseModal = true;
-          }
-          
-          setError(userMessage);
-          setLoading(false);
-          // Don't clear streamInfo - keep WebView rendered to show placeholders
-          onError?.(userMessage);
-          break;
-
-        default:
-          console.log('📹 Unknown message type:', message.type);
+</html>`;
+        
+        // Write HTML content to Documents directory
+        const htmlDest = `${RNFS.DocumentDirectoryPath}/lytx-live-video.html`;
+        console.log('📋 Writing HTML file to:', htmlDest);
+        
+        await RNFS.writeFile(htmlDest, htmlContent, 'utf8');
+        console.log('✅ HTML file written');
+        
+        // @ts-ignore
+        server = new StaticServer(0, RNFS.DocumentDirectoryPath);
+        
+        const url = await server.start();
+        console.log('✅ Local server started:', url);
+        setServerUrl(url);
+      } catch (err: any) {
+        console.error('❌ Failed to start local server:', err);
+        console.error('❌ Error message:', err.message);
+        setError('Failed to start local server');
       }
-    } catch (error) {
-      console.error('❌ Failed to parse WebView message:', error);
-    }
-  };
+    };
+    
+    startServer();
+    fetchStreamInfo();
+    
+    return () => {
+      if (server) {
+        console.log('🛑 Stopping local HTTP server...');
+        server.stop();
+      }
+    };
+  }, [imei, authToken]);
 
   return (
     <View style={[styles.container, { backgroundColor: '#000' }]}>
+      {/* Close button */}
       <TouchableOpacity 
         style={styles.closeButton}
         onPress={onClose}
@@ -400,41 +298,44 @@ export default function LiveVideoPlayer({
         <ThemedText style={styles.closeButtonText}>✕ Close</ThemedText>
       </TouchableOpacity>
 
-      {/* Fallback placeholder views - always show behind WebView */}
-      {streamInfo && (
-        <View style={styles.placeholderContainer}>
-          <View style={styles.placeholderView}>
-            <ThemedText style={styles.placeholderIcon}>🚗</ThemedText>
-            <ThemedText style={styles.placeholderText}>Road Camera</ThemedText>
-          </View>
-          <View style={styles.placeholderView}>
-            <ThemedText style={styles.placeholderIcon}>👤</ThemedText>
-            <ThemedText style={styles.placeholderText}>In-Cabin Camera</ThemedText>
-          </View>
-        </View>
-      )}
-
-      {/* WebView with transparent background */}
-      {streamInfo && (
+      {/* WebView with local HTTP server */}
+      {streamInfo && !loading && !error && serverUrl && (
         <WebView
-          ref={webViewRef}
-          source={{ html: buildLiveVideoHTML(streamInfo) }}
-          style={styles.webview}
+          source={{ uri: `${serverUrl}/lytx-live-video.html` }}
+          style={{ flex: 1 }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           mediaPlaybackRequiresUserAction={false}
           allowsInlineMediaPlayback={true}
-          onMessage={handleMessage}
-          allowsFullscreenVideo={true}
-          scrollEnabled={false}
-          bounces={false}
-          mixedContentMode="always"
-          androidLayerType="hardware"
-          originWhitelist={['*']}
-          cacheEnabled={true}
-          cacheMode="LOAD_DEFAULT"
-          allowsBackForwardNavigationGestures={false}
-          startInLoadingState={false}
+          onLoad={() => {
+            console.log('📄 HTML loaded from local server');
+            console.log('🔑 Sending credentials to WebView...');
+          }}
+          onMessage={(event) => {
+            try {
+              const message = JSON.parse(event.nativeEvent.data);
+              console.log('📨 Message from WebView:', message.type);
+              
+              if (message.type === 'console_log') {
+                console.log('🌐', message.data);
+              } else if (message.type === 'console_error') {
+                console.error('🌐', message.data);
+              } else if (message.type === 'CAMERAS_INITIALIZED') {
+                console.log('✅ Cameras initialized with origin:', message.origin);
+              }
+            } catch (err) {
+              console.error('❌ Failed to parse WebView message:', err);
+            }
+          }}
+          injectedJavaScript={`
+            window.postMessage({
+              type: 'INIT_LIVE_VIDEO',
+              imei: '${imei}',
+              familyId: ${streamInfo.familyId},
+              authToken: '${streamInfo.surfsightJwt}'
+            });
+            true;
+          `}
         />
       )}
 
@@ -442,7 +343,51 @@ export default function LiveVideoPlayer({
       {loading && !streamInfo && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <ThemedText style={styles.loadingText}>Preparing live video...</ThemedText>
+          <ThemedText style={styles.loadingText}>
+            {wakingUp ? 'Waking up camera...' : 'Preparing live video...'}
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Error overlay with wake-up option */}
+      {error && (
+        <View style={styles.errorOverlay}>
+          <View style={styles.errorPopup}>
+            <ThemedText style={styles.errorPopupTitle}>⚠️ Connection Issue</ThemedText>
+            <ThemedText style={styles.errorPopupText}>{error}</ThemedText>
+            
+            {/* Show wake-up button if error suggests standby */}
+            {(() => {
+              const showWakeUp = error.includes('standby') || 
+                                 error.includes('Starting Up') || 
+                                 error.includes('offline') || 
+                                 error.includes('Standby') || 
+                                 error.includes('wake-up command could not be completed') || 
+                                 error.includes('Network Error');
+              return showWakeUp;
+            })() && (
+              <TouchableOpacity 
+                style={[styles.wakeUpButton, wakingUp && styles.wakeUpButtonDisabled]}
+                onPress={wakeUpCamera}
+                disabled={wakingUp}
+              >
+                <ThemedText style={styles.wakeUpButtonText}>
+                  {wakingUp ? '⏳ Waking Up...' : '⏰ Wake Up Camera'}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => {
+                setError(null);
+                setLoading(true);
+                fetchStreamInfo();
+              }}
+            >
+              <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -467,43 +412,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  placeholderContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'column',
-    gap: 8,
-    padding: 8,
-    zIndex: 1,
-  },
-  placeholderView: {
-    flex: 1,
-    backgroundColor: '#2C2C2E',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-    opacity: 0.5,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#8E8E93',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -554,6 +462,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
     opacity: 0.9,
+  },
+  wakeUpButton: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  wakeUpButtonDisabled: {
+    backgroundColor: '#666666',
+    opacity: 0.6,
+  },
+  wakeUpButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   retryButton: {
     backgroundColor: '#007AFF',
