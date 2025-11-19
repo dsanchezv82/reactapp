@@ -376,21 +376,25 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
         await saveCachedGpsData(currentTrip);
       } else {
         console.log('ℹ️ [GPSContext] No GPS data available for this time range');
-        // If no fresh data, always try to load cached data as fallback (last known location)
+        // Always fall back to cached data when API returns empty
         console.log('📦 [GPSContext] No live data - loading cached data as fallback...');
         await loadCachedGpsData();
+        
+        // If we successfully loaded cached data, mark it as cached
+        // (loadCachedGpsData sets isUsingCachedData internally if cache exists)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load GPS data';
       console.error('❌ [GPSContext] Error fetching GPS data:', errorMessage);
       setError(errorMessage);
       
-      // On error, if we don't have data already, try to load from cache
-      if (gpsHistory.length === 0) {
-        console.log('📦 [GPSContext] API failed, attempting to load cached data...');
-        await loadCachedGpsData();
-      } else {
-        console.log('📍 [GPSContext] API failed but keeping existing GPS data');
+      // On error, always try to load from cache as fallback
+      console.log('📦 [GPSContext] API failed, attempting to load cached data...');
+      await loadCachedGpsData();
+      
+      // If cache load succeeded, keep the data; otherwise user sees empty map
+      if (gpsHistory.length > 0) {
+        console.log('📍 [GPSContext] Keeping existing GPS data after API failure');
         setIsUsingCachedData(true);
       }
     } finally {

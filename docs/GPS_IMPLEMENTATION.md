@@ -545,6 +545,31 @@ User may be at home, but they want to see where their vehicle is.
 
 ## Common Issues & Solutions
 
+### Issue: "GPS not updating on app launch"
+
+**Status:** ✅ FIXED (November 18, 2025)
+
+**Previous Behavior:**
+- App would show stale cached GPS data on launch
+- Manual tap on recenter button required to get fresh data
+- Auto-refresh (30s interval) would not trigger properly
+
+**Root Cause:**
+- When API returned empty GPS data, the fallback logic checked `if (gpsHistory.length === 0)` before reloading cached data
+- This prevented cached data from being reloaded if it was already loaded once
+- Result: stale data displayed until manual refresh
+
+**Fix Applied:**
+- Changed fallback logic to **always** load cached data when API returns empty, regardless of current `gpsHistory` state
+- Ensures the most recent cached data is displayed immediately
+- Auto-refresh now works correctly from initial load
+
+**New Behavior:**
+- App shows latest available GPS data (live or cached) immediately on launch
+- Auto-refresh works from first load
+- Orange banner indicates when using cached data
+- Manual refresh still available for immediate updates
+
 ### Issue: "No GPS data available"
 
 **Causes:**
