@@ -161,9 +161,12 @@ export default function LandingScreen({ navigation }: any) {
   const processGpsDataForMap = useCallback(() => {
     if (!gpsHistory || gpsHistory.length === 0) {
       console.log('ℹ️ No GPS data available from context');
-      if (mapData.length > 0) {
-        setMapData([]);
-      }
+      setMapData(prevData => {
+        if (prevData.length > 0) {
+          return [];
+        }
+        return prevData;
+      });
       return;
     }
 
@@ -194,7 +197,7 @@ export default function LandingScreen({ navigation }: any) {
         latitude: point.latitude,
         longitude: point.longitude,
         title: index === latest20Points.length - 1 ? 'Current Location' : `Location ${index + 1}`,
-        description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` • ${point.speed.toFixed(1)} mph` : ''}`,
+        description: `${new Date(point.timestamp).toLocaleString()}${point.speed ? ` - ${point.speed.toFixed(1)} mph` : ''}`,
         type: index === latest20Points.length - 1 ? 'vehicle' : 'checkpoint',
         timestamp: point.timestamp,
         speed: point.speed,
@@ -202,20 +205,29 @@ export default function LandingScreen({ navigation }: any) {
     
     // Only update if data actually changed - compare latest timestamp and count
     if (markers.length > 0) {
-      const hasChanged = 
-        mapData.length !== markers.length ||
-        mapData.length === 0 ||
-        (mapData[mapData.length - 1]?.timestamp !== markers[markers.length - 1]?.timestamp);
-      
-      if (hasChanged) {
-        setMapData(markers);
-        console.log('✅ GPS markers updated:', markers.length, 'points');
-      }
-    } else if (mapData.length > 0) {
+      setMapData(prevData => {
+        const hasChanged = 
+          prevData.length !== markers.length ||
+          prevData.length === 0 ||
+          (prevData[prevData.length - 1]?.timestamp !== markers[markers.length - 1]?.timestamp);
+        
+        if (hasChanged) {
+          console.log('✅ GPS markers updated:', markers.length, 'points');
+          console.log('📍 Latest marker:', {
+            lat: markers[markers.length - 1].latitude,
+            lon: markers[markers.length - 1].longitude,
+            time: markers[markers.length - 1].timestamp,
+            speed: markers[markers.length - 1].speed
+          });
+          return markers;
+        }
+        return prevData;
+      });
+    } else {
       console.log('⚠️ No valid GPS coordinates found in data');
-      setMapData([]);
+      setMapData(prevData => prevData.length > 0 ? [] : prevData);
     }
-  }, [gpsHistory, mapData]);
+  }, [gpsHistory]);
 
   // Initialize location and process GPS data when screen is focused
   useFocusEffect(
@@ -241,6 +253,8 @@ export default function LandingScreen({ navigation }: any) {
 
   // Update map markers whenever GPS data changes (from global context)
   useEffect(() => {
+    console.log('🔄 [LandingScreen] GPS history changed, processing data...');
+    console.log('📊 [LandingScreen] GPS history length:', gpsHistory?.length || 0);
     processGpsDataForMap();
   }, [gpsHistory, processGpsDataForMap]);
 

@@ -1,11 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { STATIONARY_THRESHOLD_MS } from '../utils/vehicleStatus';
 import { useAuth } from './AuthContext';
 
 const API_BASE_URL = 'https://api.garditech.com/api';
 const GPS_CACHE_KEY = '@gps_history_cache';
 const TRIPS_CACHE_KEY = '@gps_trips_history';
+const BACKGROUND_FETCH_TASK = 'gps-background-fetch';
+const GPS_CREDENTIALS_KEY = '@gps_background_credentials';
 
 interface GpsDataPoint {
   latitude: number;
@@ -40,6 +45,111 @@ interface GPSContextType {
 
 const GPSContext = createContext<GPSContextType | undefined>(undefined);
 
+// Define the background fetch task (must be defined at module level)
+TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
+  console.log('🌙 [BackgroundFetch] GPS background task triggered');
+  
+  try {
+    // Retrieve credentials from storage
+    const credentialsJson = await AsyncStorage.getItem(GPS_CREDENTIALS_KEY);
+    if (!credentialsJson) {
+      console.log('⚠️ [BackgroundFetch] No credentials found');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    const { authToken, imei } = JSON.parse(credentialsJson);
+    
+    // Fetch GPS data
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+    
+    const url = `${API_BASE_URL}/devices/${imei}/gps?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`;
+    
+    console.log('🌙 [BackgroundFetch] Fetching GPS data for IMEI:', imei);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`❌ [BackgroundFetch] GPS API error: ${response.status}`);
+      return BackgroundFetch.BackgroundFetchResult.Failed;
+    }
+
+    const data = await response.json();
+    
+    if (data.gpsData && Array.isArray(data.gpsData) && data.gpsData.length > 0) {
+      // Transform and cache the data
+      const transformedData = data.gpsData.map((point: any) => ({
+        latitude: point.lat,
+        longitude: point.lon,
+        timestamp: new Date(point.time * 1000).toISOString(),
+        speed: point.speed ? point.speed * 2.23694 : undefined,
+        heading: point.heading,
+        accuracy: point.accuracy,
+      }));
+      
+      const sortedData = transformedData.sort((a: GpsDataPoint, b: GpsDataPoint) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      
+      // Save to cache
+      await AsyncStorage.setItem(GPS_CACHE_KEY, JSON.stringify({
+        data: sortedData,
+        timestamp: new Date().toISOString(),
+      }));
+      
+      console.log(`✅ [BackgroundFetch] Cached ${sortedData.length} GPS points`);
+      return BackgroundFetch.BackgroundFetchResult.NewData;
+    }
+    
+    console.log('ℹ️ [BackgroundFetch] No new GPS data');
+    return BackgroundFetch.BackgroundFetchResult.NoData;
+  } catch (error) {
+    console.error('❌ [BackgroundFetch] Error:', error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+});
+
+// Register the background fetch task
+async function registerBackgroundFetchAsync() {
+  try {
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_FETCH_TASK);
+    
+    if (!isRegistered) {
+      console.log('📋 [GPSContext] Registering background fetch task');
+      await BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
+        minimumInterval: 60 * 15, // 15 minutes (iOS minimum)
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+      console.log('✅ [GPSContext] Background fetch registered');
+    } else {
+      console.log('✅ [GPSContext] Background fetch already registered');
+    }
+  } catch (err) {
+    console.error('❌ [GPSContext] Failed to register background fetch:', err);
+  }
+}
+
+// Unregister the background fetch task
+async function unregisterBackgroundFetchAsync() {
+  try {
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_FETCH_TASK);
+    if (isRegistered) {
+      console.log('🗑️ [GPSContext] Unregistering background fetch task');
+      await BackgroundFetch.unregisterTaskAsync(BACKGROUND_FETCH_TASK);
+      console.log('✅ [GPSContext] Background fetch unregistered');
+    }
+  } catch (err) {
+    console.error('❌ [GPSContext] Failed to unregister background fetch:', err);
+  }
+}
+
 export function GPSProvider({ children }: { children: React.ReactNode }) {
   const { authToken, user, isAuthenticated, logout } = useAuth();
   const [gpsHistory, setGpsHistory] = useState<GpsDataPoint[]>([]);
@@ -49,6 +159,8 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
   const [isUsingCachedData, setIsUsingCachedData] = useState(false);
   const [savedTrips, setSavedTrips] = useState<TripData[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appState = useRef(AppState.currentState);
+  const [isInBackground, setIsInBackground] = useState(false);
 
   // Helper: Calculate distance between two GPS points (Haversine formula)
   const calculateDistance = (points: GpsDataPoint[]): number => {
@@ -407,13 +519,64 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
     await fetchGpsData(false);
   };
 
+  // Monitor app state changes for background/foreground transitions
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [isAuthenticated, authToken, user?.imei]);
+
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    console.log('📱 [GPSContext] App state changed:', appState.current, '→', nextAppState);
+
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App has come to foreground
+      console.log('🌅 [GPSContext] App foregrounded - resuming foreground GPS polling');
+      setIsInBackground(false);
+      
+      // Fetch fresh GPS data immediately when app comes to foreground
+      if (isAuthenticated && authToken && user?.imei) {
+        console.log('🔄 [GPSContext] Fetching fresh GPS data on foreground...');
+        await fetchGpsData(false);
+      }
+    } else if (nextAppState.match(/inactive|background/)) {
+      // App is going to background
+      console.log('🌙 [GPSContext] App backgrounded - switching to background GPS mode');
+      setIsInBackground(true);
+    }
+
+    appState.current = nextAppState;
+  };
+
+  // Register background fetch task
+  useEffect(() => {
+    if (isAuthenticated && authToken && user?.imei) {
+      registerBackgroundFetchAsync();
+      
+      // Store credentials for background task
+      AsyncStorage.setItem(GPS_CREDENTIALS_KEY, JSON.stringify({
+        authToken,
+        imei: user.imei,
+      }));
+    }
+
+    return () => {
+      // Cleanup: unregister background task when user logs out
+      if (!isAuthenticated) {
+        unregisterBackgroundFetchAsync();
+        AsyncStorage.removeItem(GPS_CREDENTIALS_KEY);
+      }
+    };
+  }, [isAuthenticated, authToken, user?.imei]);
+
   // Load cached GPS data on mount and when user logs in
   useEffect(() => {
     loadCachedGpsData();
     loadSavedTrips();
   }, [isAuthenticated, user?.imei]);
 
-  // Start GPS tracking when authenticated
+  // Start GPS tracking when authenticated (foreground only)
   useEffect(() => {
     if (!isAuthenticated || !authToken || !user?.imei) {
       console.log('⏸️ [GPSContext] Not authenticated, skipping GPS tracking');
@@ -425,30 +588,40 @@ export function GPSProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log('🚀 [GPSContext] Starting GPS tracking for IMEI:', user.imei);
+    // Only run foreground polling when app is active
+    if (isInBackground) {
+      console.log('🌙 [GPSContext] App in background - skipping foreground polling');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    console.log('🚀 [GPSContext] Starting foreground GPS tracking for IMEI:', user.imei);
     
     // Initial fetch
     fetchGpsData(false);
     
-    // Set up auto-refresh every 30 seconds - runs globally regardless of screen
+    // Set up auto-refresh every 30 seconds - runs only in foreground
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
     
     intervalRef.current = setInterval(() => {
-      console.log('🔄 [GPSContext] Auto-refreshing GPS data...');
+      console.log('🔄 [GPSContext] Auto-refreshing GPS data (foreground)...');
       fetchGpsData(true);
     }, 30000); // 30 seconds
 
     // Cleanup on unmount or when auth changes
     return () => {
-      console.log('⏸️ [GPSContext] Stopping GPS tracking');
+      console.log('⏸️ [GPSContext] Stopping foreground GPS tracking');
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [isAuthenticated, authToken, user?.imei]);
+  }, [isAuthenticated, authToken, user?.imei, isInBackground]);
 
   return (
     <GPSContext.Provider value={{ gpsHistory, lastGpsUpdate, loading, error, refreshGpsData, isUsingCachedData, savedTrips, getSavedTrips }}>

@@ -1,15 +1,15 @@
-import { AlertTriangle, Calendar, Clock, MapPin, Video } from 'lucide-react-native';
+import { AlertTriangle, Calendar, Video } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Platform,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +27,12 @@ const API_BASE_URL = 'https://api.garditech.com/api';
 interface DeviceEvent {
   id: string | number;
   eventType: string;
+  eventTypeInfo?: {
+    eventName: string;
+    apiSyntax: string;
+    webhookSyntax: string;
+    eventDescription: string;
+  };
   time: string; // Surfsight uses 'time' not 'timestamp'
   lat: number;
   lon: number;
@@ -302,22 +308,23 @@ export default function EventsScreen() {
             <View style={styles.eventInfo}>
               <View style={styles.eventTitleRow}>
                 <ThemedText type="subtitle" style={styles.eventTitle}>
-                  {item.eventType || 'Event'}
+                  {item.eventTypeInfo?.eventName || item.eventType || 'Event'}
                 </ThemedText>
-                <View style={[styles.severityBadge, { backgroundColor: severityInfo.color + '20' }]}>
-                  <ThemedText style={[styles.severityText, { color: severityInfo.color }]}>
-                    {severityInfo.icon} {item.severity || 'Info'}
-                  </ThemedText>
-                </View>
               </View>
               
               <View style={styles.eventMeta}>
-                <Clock size={14} color={theme.colors.textSecondary} strokeWidth={2} />
                 <ThemedText type="secondary" style={styles.eventTime}>
                   {formatEventTime(item.time)}
                 </ThemedText>
               </View>
             </View>
+            
+            {/* Show video indicator on the right side if files are available */}
+            {item.files && item.files.length > 0 && (
+              <View style={styles.videoIndicator}>
+                <Video size={28} color={theme.colors.primary} strokeWidth={2} />
+              </View>
+            )}
           </View>
           
           {item.description && (
@@ -325,35 +332,6 @@ export default function EventsScreen() {
               {item.description}
             </ThemedText>
           )}
-
-          <View style={styles.eventDetails}>
-            {/* Show coordinates if available (lat/lon from Surfsight) */}
-            {item.lat !== -1 && item.lon !== -1 && (
-              <View style={styles.eventLocation}>
-                <MapPin size={14} color={theme.colors.textSecondary} strokeWidth={2} />
-                <ThemedText type="secondary" style={styles.locationText} numberOfLines={1}>
-                  {item.lat.toFixed(5)}, {item.lon.toFixed(5)}
-                </ThemedText>
-              </View>
-            )}
-            
-            {/* Show video indicator if files are available */}
-            {item.files && item.files.length > 0 && (
-              <View style={styles.videoIndicator}>
-                <Video size={14} color={theme.colors.primary} strokeWidth={2} />
-                <ThemedText type="secondary" style={[styles.videoText, { color: theme.colors.primary }]}>
-                  {item.files.length} Video{item.files.length > 1 ? 's' : ''}
-                </ThemedText>
-              </View>
-            )}
-            
-            {/* Show speed if available */}
-            {item.speed !== undefined && item.speed > 0 && (
-              <ThemedText type="secondary" style={styles.speedText}>
-                {item.speed} mph
-              </ThemedText>
-            )}
-          </View>
         </View>
       </TouchableOpacity>
     );

@@ -2,16 +2,16 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { AlertTriangle, Calendar, Clock, MapPin, Pause, Play, RotateCcw, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Modal,
-    PanResponder,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -40,6 +40,12 @@ interface EventDetailModalProps {
 interface EventDetail {
   id: string | number;
   eventType: string;
+  eventTypeInfo?: {
+    eventName: string;
+    apiSyntax: string;
+    webhookSyntax: string;
+    eventDescription: string;
+  };
   time: string;
   lat: number;
   lon: number;
@@ -547,7 +553,7 @@ export default function EventDetailModal({ visible, eventId, imei, onClose }: Ev
             <View style={styles.section}>
               <View style={styles.eventTypeRow}>
                 <ThemedText type="title" style={styles.eventType}>
-                  {eventDetail.eventType || 'Event'}
+                  {eventDetail.eventTypeInfo?.eventName || eventDetail.eventType || 'Event'}
                 </ThemedText>
                 {severityInfo && (
                   <View style={[styles.severityBadge, { backgroundColor: severityInfo.color + '20' }]}>
@@ -558,7 +564,15 @@ export default function EventDetailModal({ visible, eventId, imei, onClose }: Ev
                 )}
               </View>
 
-              {eventDetail.description && (
+              {/* Event description from eventTypeInfo */}
+              {eventDetail.eventTypeInfo?.eventDescription && (
+                <ThemedText style={styles.description}>
+                  {eventDetail.eventTypeInfo.eventDescription}
+                </ThemedText>
+              )}
+
+              {/* Fallback to regular description if no eventTypeInfo */}
+              {!eventDetail.eventTypeInfo?.eventDescription && eventDetail.description && (
                 <ThemedText style={styles.description}>
                   {eventDetail.description}
                 </ThemedText>
